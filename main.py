@@ -29,7 +29,7 @@ parser.add_argument('--results-dir', type=str, default='./results', dest='r_dir'
 
 # expirimental task parameters
 task_params = parser.add_argument_group('Task Parameters')
-task_params.add_argument('--experiment', type=str, default='splitMNIST', choices=['permMNIST', 'splitMNIST'])
+task_params.add_argument('--experiment', type=str, default='splitMNIST', choices=['permMNIST', 'splitMNIST', 'splitCIFAR10', 'splitFashionMNIST'])
 task_params.add_argument('--scenario', type=str, default='class', choices=['task', 'domain', 'class'])
 task_params.add_argument('--tasks', type=int, default=5, help='number of tasks')
 
@@ -89,7 +89,7 @@ cl_params.add_argument('--xdg', type=float, default=0., dest="gating_prop",help=
 
 # exemplar parameters
 icarl_params = parser.add_argument_group('Exemplar Parameters')
-icarl_params.add_argument('--icarl', action='store_true', help="bce-distill, use-exemplars & add-exemplars")
+icarl_params.add_argument('--eicarl', action='store_true', help="bce-distill, use-exemplars & add-exemplars")
 icarl_params.add_argument('--use-exemplars', action='store_true', help="use exemplars for classification")
 icarl_params.add_argument('--add-exemplars', action='store_true', help="add exemplars to current task dataset")
 icarl_params.add_argument('--budget', type=int, default=2000, dest="budget", help="how many exemplars can be stored?")

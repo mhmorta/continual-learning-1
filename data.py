@@ -126,6 +126,8 @@ class ExemplarDataset(Dataset):
 # specify available data-sets.
 AVAILABLE_DATASETS = {
     'mnist': datasets.MNIST,
+    'cifar10': datasets.CIFAR10,
+    'FashionMNIST': datasets.FashionMNIST,
 }
 
 # specify available transforms.
@@ -137,12 +139,21 @@ AVAILABLE_TRANSFORMS = {
     'mnist28': [
         transforms.ToTensor(),
     ],
+    'cifar10': [
+        transforms.ToTensor(),
+    ],
+    'FashionMNIST': [
+        transforms.ToTensor(),
+    ],
 }
 
 # specify configurations of available data-sets.
 DATASET_CONFIGS = {
     'mnist': {'size': 32, 'channels': 1, 'classes': 10},
     'mnist28': {'size': 28, 'channels': 1, 'classes': 10},
+    'cifar10': {'size': 32, 'channels': 3, 'classes': 10},
+    'FashionMNIST': {'size': 28, 'channels': 1, 'classes': 10},
+
 }
 
 
@@ -178,21 +189,30 @@ def get_multitask_experiment(name, scenario, tasks, data_dir="./datasets", only_
                                                   target_transform=target_transform, verbose=verbose))
                 test_datasets.append(get_dataset('mnist', type="test", permutation=p, dir=data_dir,
                                                  target_transform=target_transform, verbose=verbose))
-    elif name == 'splitMNIST':
+    elif len (name.split('split')) > 1: 
+        if name == 'splitMNIST':
+            dataset_name = 'mnist28'
+        elif name == 'splitCIFAR10':
+            dataset_name = 'cifar10'
+        elif name == 'splitFashionMNIST':
+            dataset_name = 'FashionMNIST'
+        else:
+            raise ValueError("Experiment '{0}' not mapped to any dataset".format(name))
+
         # check for number of tasks
         if tasks>10:
-            raise ValueError("Experiment 'splitMNIST' cannot have more than 10 tasks!")
+            raise ValueError("Experiment '{0}' cannot have more than 10 tasks!".format(name))
         # configurations
-        config = DATASET_CONFIGS['mnist28']
+        config = DATASET_CONFIGS[dataset_name]
         classes_per_task = int(np.floor(10 / tasks))
         if not only_config:
             # prepare permutation to shuffle label-ids (to create different class batches for each random seed)
             permutation = np.array(list(range(10))) if exception else np.random.permutation(list(range(10)))
             target_transform = transforms.Lambda(lambda y, x=permutation: int(permutation[y]))
             # prepare train and test datasets with all classes
-            mnist_train = get_dataset('mnist28', type="train", dir=data_dir, target_transform=target_transform,
+            data_train = get_dataset(dataset_name, type="train", dir=data_dir, target_transform=target_transform,
                                       verbose=verbose)
-            mnist_test = get_dataset('mnist28', type="test", dir=data_dir, target_transform=target_transform,
+            data_test = get_dataset(dataset_name, type="test", dir=data_dir, target_transform=target_transform,
                                      verbose=verbose)
             # generate labels-per-task
             labels_per_task = [
@@ -205,8 +225,8 @@ def get_multitask_experiment(name, scenario, tasks, data_dir="./datasets", only_
                 target_transform = transforms.Lambda(
                     lambda y, x=labels[0]: y - x
                 ) if scenario=='domain' else None
-                train_datasets.append(SubDataset(mnist_train, labels, target_transform=target_transform))
-                test_datasets.append(SubDataset(mnist_test, labels, target_transform=target_transform))
+                train_datasets.append(SubDataset(data_train, labels, target_transform=target_transform))
+                test_datasets.append(SubDataset(data_test, labels, target_transform=target_transform))
     else:
         raise RuntimeError('Given undefined experiment: {}'.format(name))
 
