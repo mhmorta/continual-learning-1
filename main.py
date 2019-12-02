@@ -89,7 +89,7 @@ cl_params.add_argument('--xdg', type=float, default=0., dest="gating_prop",help=
 
 # exemplar parameters
 icarl_params = parser.add_argument_group('Exemplar Parameters')
-icarl_params.add_argument('--eicarl', action='store_true', help="bce-distill, use-exemplars & add-exemplars")
+icarl_params.add_argument('--icarl', action='store_true', help="bce-distill, use-exemplars & add-exemplars")
 icarl_params.add_argument('--use-exemplars', action='store_true', help="use exemplars for classification")
 icarl_params.add_argument('--add-exemplars', action='store_true', help="add exemplars to current task dataset")
 icarl_params.add_argument('--budget', type=int, default=2000, dest="budget", help="how many exemplars can be stored?")
@@ -98,9 +98,9 @@ icarl_params.add_argument('--norm-exemplars', action='store_true', help="normali
 
 # evaluation parameters
 eval_params = parser.add_argument_group('Evaluation Parameters')
-eval_params.add_argument('--pdf', action='store_true', help="generate pdf with results")
-eval_params.add_argument('--visdom', action='store_true', help="use visdom for on-the-fly plots")
-eval_params.add_argument('--log-per-task', action='store_true', help="set all visdom-logs to [iters]")
+eval_params.add_argument('--pdf', type=bool, default=True, help="generate pdf with results")
+eval_params.add_argument('--visdom', type=bool, default=True, help="use visdom for on-the-fly plots")
+eval_params.add_argument('--log-per-task', type=bool, default=True, help="set all visdom-logs to [iters]")
 eval_params.add_argument('--loss-log', type=int, default=200, metavar="N", help="# iters after which to plot loss")
 eval_params.add_argument('--prec-log', type=int, default=200, metavar="N", help="# iters after which to plot precision")
 eval_params.add_argument('--prec-n', type=int, default=1024, help="# samples for evaluating solver's precision")
@@ -492,19 +492,26 @@ def run(args):
         figure_list = []  #-> create list to store all figures to be plotted
         # -generate all figures (and store them in [figure_list])
         figure = visual_plt.plot_lines(
-            precision_dict["all_tasks"], x_axes=precision_dict["x_task"],
+            precision_dict["all_tasks"],
+            x_axes=precision_dict["x_task"],
             line_names=['task {}'.format(i + 1) for i in range(args.tasks)]
         )
         figure_list.append(figure)
         figure = visual_plt.plot_lines(
-            [precision_dict["average"]], x_axes=precision_dict["x_task"],
-            line_names=['average all tasks so far']
+            [precision_dict["average"]],
+            x_axes=precision_dict["x_task"],
+            line_names=['average all tasks so far'],
+            xlabel="Task #",
+            ylabel="Average precision score "
         )
         figure_list.append(figure)
         if args.use_exemplars:
             figure = visual_plt.plot_lines(
-                precision_dict_exemplars["all_tasks"], x_axes=precision_dict_exemplars["x_task"],
-                line_names=['task {}'.format(i + 1) for i in range(args.tasks)]
+                precision_dict_exemplars["all_tasks"],
+                x_axes=precision_dict_exemplars["x_task"],
+                line_names=['task {}'.format(i + 1) for i in range(args.tasks)],
+                xlabel="Task #",
+                ylabel="Precision score"
             )
             figure_list.append(figure)
         # -add figures to pdf (and close this pdf).

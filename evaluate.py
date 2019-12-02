@@ -78,7 +78,7 @@ def precision(model, datasets, current_task, iteration, classes_per_task=None, s
     '''Evaluate precision of a classifier (=[model]) on all tasks so far (= up to [current_task]) using [datasets].
 
     [precision_dict]    None or <dict> of all measures to keep track of, to which results will be appended to
-    [classes_per_task]  <int> number of active classes er task
+    [classes_per_task]  <int> number of active classes per task
     [scenario]          <str> how to decide which classes to include during evaluating precision
     [visdom]            None or <dict> with name of "graph" and "env" (if None, no visdom-plots are made)'''
 

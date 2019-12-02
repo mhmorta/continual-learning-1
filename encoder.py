@@ -6,6 +6,7 @@ from continual_learner import ContinualLearner
 from replayer import Replayer
 import utils
 
+from sklearn.metrics import confusion_matrix
 
 class Classifier(ContinualLearner, Replayer, ExemplarHandler):
     '''Model for classifying images, "enriched" as "ContinualLearner"-, Replayer- and ExemplarHandler-object.'''
@@ -98,6 +99,23 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
             if active_classes is not None:
                 class_entries = active_classes[-1] if type(active_classes[0])==list else active_classes
                 y_hat = y_hat[:, class_entries]
+
+            # # Separate images of current and previous tasks
+            # if task > 1:
+            #     previous_tasks = active_classes[-1] - int(y_hat.size(1) / task)
+            #     y_prev = [indx for indx, val in enumerate(y) if val <= previous_tasks ]
+            #     x_prev = [x[indx] for indx in y_prev]
+            #     y_hat_prev = self(x_prev)
+
+            #     y_cur = [indx for indx, val in enumerate(y) if val > previous_tasks ]
+            #     x_cur = [x[indx] for indx in y_cur]
+            #     y_hat_cur = self(x_cur)
+            #     print("y_prev.size = {}")
+
+            # # using accuracy to reweight the loss
+            # matrix = confusion_matrix(y.detach().numpy(), y_hat.max(1)[1].detach().numpy())
+            # acc = matrix.diagonal() / matrix.sum(axis=1)
+
 
             # Calculate prediction loss
             if self.binaryCE:
