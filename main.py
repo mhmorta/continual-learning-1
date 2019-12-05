@@ -17,6 +17,7 @@ from train import train_cl
 from continual_learner import ContinualLearner
 from exemplars import ExemplarHandler
 from replayer import Replayer
+from torchsummary import summary
 
 
 parser = argparse.ArgumentParser('./main.py', description='Run individual continual learning experiment.')
@@ -107,6 +108,10 @@ eval_params.add_argument('--prec-n', type=int, default=1024, help="# samples for
 eval_params.add_argument('--sample-log', type=int, default=500, metavar="N", help="# iters after which to plot samples")
 eval_params.add_argument('--sample-n', type=int, default=64, help="# images to show")
 
+# reweighting parameters
+reweighting_params = parser.add_argument_group('Reweighting Parameters')
+reweighting_params.add_argument('--class-reweighting', type=bool, default=False, help='Use class reweighting to pass for the criterion')
+reweighting_params.add_argument('--smoothing-factor', type=float, default=4, help='Smoothing factor for the reweighting')
 
 
 def run(args):
@@ -206,6 +211,8 @@ def run(args):
             fc_bn=True if args.fc_bn=="yes" else False, excit_buffer=True if args.gating_prop>0 else False,
             binaryCE=args.bce, binaryCE_distill=args.bce_distill,
         ).to(device)
+
+
 
     # Define optimizer (only include parameters that "requires_grad")
     model.optim_list = [{'params': filter(lambda p: p.requires_grad, model.parameters()), 'lr': args.lr}]
@@ -315,7 +322,8 @@ def run(args):
     # Print some model-characteristics on the screen
     # -main model
     print("\n")
-    utils.print_model_info(model, title="MAIN MODEL")
+    # utils.print_model_info(model, title="MAIN MODEL")
+    summary(model, input_size=(3, 32, 32))
     # -generator
     if generator is not None:
         utils.print_model_info(generator, title="GENERATOR")
@@ -426,11 +434,11 @@ def run(args):
         model, test_datasets[i], verbose=False, test_size=None, task=i+1, with_exemplars=False,
         allowed_classes=list(range(classes_per_task*i, classes_per_task*(i+1))) if scenario=="task" else None
     ) for i in range(args.tasks)]
-    print("\n Precision on test-set (softmax classification):")
+    print("\n Accuracy on test-set (softmax classification):")
     for i in range(args.tasks):
         print(" - Task {}: {:.4f}".format(i + 1, precs[i]))
     average_precs = sum(precs) / args.tasks
-    print('=> average precision over all {} tasks: {:.4f}'.format(args.tasks, average_precs))
+    print('=> average accuracy over all {} tasks: {:.4f}'.format(args.tasks, average_precs))
 
     # -with exemplars
     if args.use_exemplars:
@@ -438,11 +446,11 @@ def run(args):
             model, test_datasets[i], verbose=False, test_size=None, task=i+1, with_exemplars=True,
             allowed_classes=list(range(classes_per_task*i, classes_per_task*(i+1))) if scenario=="task" else None
         ) for i in range(args.tasks)]
-        print("\n Precision on test-set (classification using exemplars):")
+        print("\n Accuracy on test-set (classification using exemplars):")
         for i in range(args.tasks):
             print(" - Task {}: {:.4f}".format(i + 1, precs[i]))
         average_precs_ex = sum(precs) / args.tasks
-        print('=> average precision over all {} tasks: {:.4f}'.format(args.tasks, average_precs_ex))
+        print('=> average accuracy over all {} tasks: {:.4f}'.format(args.tasks, average_precs_ex))
     print("\n")
 
 

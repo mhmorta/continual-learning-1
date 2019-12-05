@@ -65,7 +65,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         return self.fcE(self.flatten(images))
 
 
-    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1):
+    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1, class_weights=None):
         '''Train model for one batch ([x],[y]), possibly supplemented with replayed data ([x_],[y_/scores_]).
 
         [x]               <tensor> batch of inputs (could be None, in which case only 'replayed' data is used)
@@ -77,7 +77,8 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         [scores_]         None or (<list> of) <tensor> 2Dtensor:[batch]x[classes] predicted "scores"/"logits" for [x_]
         [rnt]             <number> in [0,1], relative importance of new task
         [active_classes]  None or (<list> of) <list> with "active" classes
-        [task]            <int>, for setting task-specific mask'''
+        [task]            <int>, for setting task-specific mask
+        [class_weights]    class weights for cross entropy loss'''
 
         # Set model to training-mode
         self.train()
@@ -100,23 +101,6 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
                 class_entries = active_classes[-1] if type(active_classes[0])==list else active_classes
                 y_hat = y_hat[:, class_entries]
 
-            # # Separate images of current and previous tasks
-            # if task > 1:
-            #     previous_tasks = active_classes[-1] - int(y_hat.size(1) / task)
-            #     y_prev = [indx for indx, val in enumerate(y) if val <= previous_tasks ]
-            #     x_prev = [x[indx] for indx in y_prev]
-            #     y_hat_prev = self(x_prev)
-
-            #     y_cur = [indx for indx, val in enumerate(y) if val > previous_tasks ]
-            #     x_cur = [x[indx] for indx in y_cur]
-            #     y_hat_cur = self(x_cur)
-            #     print("y_prev.size = {}")
-
-            # # using accuracy to reweight the loss
-            # matrix = confusion_matrix(y.detach().numpy(), y_hat.max(1)[1].detach().numpy())
-            # acc = matrix.diagonal() / matrix.sum(axis=1)
-
-
             # Calculate prediction loss
             if self.binaryCE:
                 # -binary prediction loss
@@ -126,8 +110,11 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
                     binary_targets = binary_targets[:, -(classes_per_task):]
                     binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
                 predL = None if y is None else F.binary_cross_entropy_with_logits(
-                    input=y_hat, target=binary_targets, reduction='none'
-                ).sum(dim=1).mean()     #--> sum over classes, then average over batch
+                    input=y_hat,
+                    target=binary_targets,
+                    reduction='none',
+                    weight=class_weights)
+                predL = predL.sum(dim=1).mean() #--> sum over classes, then average over batch
             else:
                 # -multiclass prediction loss
                 predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='elementwise_mean')

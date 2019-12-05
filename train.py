@@ -55,6 +55,19 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
             Exact = True
             previous_datasets = train_datasets
 
+        '''
+        Before start training a new class to the model:
+            1. Create a dataloader from current tasks' data
+            2. Train a copy of the model with that dataloader
+            3. Calculate how loss OR precision over previous changes with that proposed update
+            4. Set a class-weight array to enforce each class based on its importance for the current task
+            5. Train the actual model
+            6. Store loss/precision of the model at the end of the task to be used in step 3
+        '''
+        # Step 1: creating dataloader of the current task
+        current_data_loader = iter(utils.get_data_loader(train_dataset, batch_size, cuda=cuda, drop_last=True))
+        exemplars_data_loader = None
+
         # Add exemplars (if available) to current dataset (if requested)
         if add_exemplars and task>1:
             # ---------- ADHOC SOLUTION: permMNIST needs transform to tensor, while splitMNIST does not ---------- #
@@ -67,8 +80,20 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
             # ---------------------------------------------------------------------------------------------------- #
             exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=target_transform)
             training_dataset = ConcatDataset([train_dataset, exemplar_dataset])
+            # --------------------------------
+            exemplars_data_loader = iter(utils.get_data_loader(exemplar_dataset, batch_size, cuda=cuda, drop_last=True))
         else:
             training_dataset = train_dataset
+
+        if exemplars_data_loader is not None:
+
+            x, y = next(exemplars_data_loader)
+            x, y = x.to(device), y.to(device)
+
+            # This makes it too complex, write your own here
+            # loss_dict = model.train_a_batch(x, y, x_=x_, y_=y_, scores=scores, scores_=scores_,
+            #                                 active_classes=active_classes, task=task, rnt=1. / task)
+
 
         # Prepare <dicts> to store running importance estimates and param-values before update ("Synaptic Intelligence")
         if isinstance(model, ContinualLearner) and (model.si_c>0):
@@ -240,12 +265,22 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
                 scores_ = scores_ if (model.replay_targets == "soft") else None
 
 
+            WEIGHT_SMOOTHING_FACTOR = 2
+            current_exemplars_per_class = 0 if task <2 else int(np.floor(model.memory_budget / (classes_per_task*(task-1))))
+            class_weights = torch.ones(task*classes_per_task).to(device)
+            if current_exemplars_per_class > 0:
+                class_weights[:(task-1)*classes_per_task] =   (current_exemplars_per_class * WEIGHT_SMOOTHING_FACTOR ) / 12000
+                # class_weights[:(task-1)*classes_per_task] = 5
+
+            print("class_weights = ", class_weights)
+
             #---> Train MAIN MODEL
             if batch_index <= iters:
 
+
                 # Train the main model with this batch
                 loss_dict = model.train_a_batch(x, y, x_=x_, y_=y_, scores=scores, scores_=scores_,
-                                                active_classes=active_classes, task=task, rnt = 1./task)
+                                                active_classes=active_classes, task=task, rnt = 1./task, class_weights=class_weights)
 
                 # Update running parameter importance estimates in W
                 if isinstance(model, ContinualLearner) and (model.si_c>0):
