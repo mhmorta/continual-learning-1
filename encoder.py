@@ -3,12 +3,13 @@ from torch.nn import functional as F
 from linear_nets import MLP,fc_layer
 from exemplars import ExemplarHandler
 from continual_learner import ContinualLearner
+from vnet import MetaModule
 from replayer import Replayer
 import utils
 
 from sklearn.metrics import confusion_matrix
 
-class Classifier(ContinualLearner, Replayer, ExemplarHandler):
+class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
     '''Model for classifying images, "enriched" as "ContinualLearner"-, Replayer- and ExemplarHandler-object.'''
 
     def __init__(self, image_size, image_channels, classes,
@@ -65,7 +66,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         return self.fcE(self.flatten(images))
 
 
-    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1, class_weights=None):
+    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1, class_weights=None, vnet=None):
         '''Train model for one batch ([x],[y]), possibly supplemented with replayed data ([x_],[y_/scores_]).
 
         [x]               <tensor> batch of inputs (could be None, in which case only 'replayed' data is used)
@@ -78,7 +79,9 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         [rnt]             <number> in [0,1], relative importance of new task
         [active_classes]  None or (<list> of) <list> with "active" classes
         [task]            <int>, for setting task-specific mask
-        [class_weights]    class weights for cross entropy loss'''
+        [class_weights]    class weights for cross entropy loss
+        [vnet]              weight-net
+        '''
 
         # Set model to training-mode
         self.train()
@@ -114,10 +117,29 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
                     target=binary_targets,
                     reduction='none',
                     weight=class_weights)
+                predL2 = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='none')
+
                 predL = predL.sum(dim=1).mean() #--> sum over classes, then average over batch
+
             else:
                 # -multiclass prediction loss
-                predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='elementwise_mean')
+                if vnet is not None:
+                    cost_w = None if y is None else F.cross_entropy(input=y_hat, target=y, reduce=False)
+                    # cost_w = F.cross_entropy(y_f, target_var, reduce=False)
+                    cost_v = torch.reshape(cost_w, (len(cost_w), 1))
+
+                    with torch.no_grad():
+                        w_new = vnet(cost_v)
+                    norm_v = torch.sum(w_new)
+
+                    if norm_v != 0:
+                        w_v = w_new / norm_v
+                    else:
+                        w_v = w_new
+
+                    predL = torch.sum(cost_v * w_v)
+                else:
+                    predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='elementwise_mean')
 
             # Weigh losses
             loss_cur = predL

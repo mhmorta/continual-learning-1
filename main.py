@@ -112,6 +112,7 @@ eval_params.add_argument('--sample-n', type=int, default=64, help="# images to s
 reweighting_params = parser.add_argument_group('Reweighting Parameters')
 reweighting_params.add_argument('--class-reweighting', type=bool, default=False, help='Use class reweighting to pass for the criterion')
 reweighting_params.add_argument('--smoothing-factor', type=float, default=4, help='Smoothing factor for the reweighting')
+reweighting_params.add_argument('--vnet', type=bool, default=False, help='Use VNet')
 
 
 def run(args):
@@ -323,7 +324,7 @@ def run(args):
     # -main model
     print("\n")
     # utils.print_model_info(model, title="MAIN MODEL")
-    summary(model, input_size=(3, 32, 32))
+    summary(model, input_size=(config['channels'], config['size'], config['size']))
     # -generator
     if generator is not None:
         utils.print_model_info(generator, title="GENERATOR")
@@ -413,6 +414,7 @@ def run(args):
         generator=generator, gen_iters=args.g_iters, gen_loss_cbs=generator_loss_cbs,
         sample_cbs=sample_cbs, eval_cbs=eval_cbs, loss_cbs=generator_loss_cbs if args.feedback else solver_loss_cbs,
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
+        meta_datasets = test_datasets, use_vnet=args.vnet
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start
