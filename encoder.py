@@ -105,7 +105,30 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
                 y_hat = y_hat[:, class_entries]
 
             # Calculate prediction loss
-            if self.binaryCE:
+            if vnet is not None:
+                cost_w = None if y is None else F.cross_entropy(input=y_hat, target=y, reduce=False)
+                # cost_w = F.cross_entropy(y_f, target_var, reduce=False)
+                cost_v = torch.reshape(cost_w, (len(cost_w), 1))
+
+                with torch.no_grad():
+                    w_new = vnet(cost_v)
+                norm_v = torch.sum(w_new)
+
+                if norm_v != 0:
+                    w_v = w_new / norm_v
+                else:
+                    w_v = w_new
+
+                predL = torch.sum(cost_v * w_v)
+                print(w_v)
+            elif self.binaryCE:
+                ''' Steps here are for a batch of 128 images:
+                1. generate one-hot encoding of the target y
+                2. slice last class_per_task columns of the encoding
+                3. concat temperatured sigmoided precidictions of the stored model at the end of the previous task (distillation)
+                4. calculate binary CE 
+                5. sum and mean...
+                '''
                 # -binary prediction loss
                 binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
                 if self.binaryCE_distill and (scores is not None):
@@ -117,29 +140,14 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
                     target=binary_targets,
                     reduction='none',
                     weight=class_weights)
-                predL2 = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='none')
+                # predL2 = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='none')
 
                 predL = predL.sum(dim=1).mean() #--> sum over classes, then average over batch
 
             else:
-                # -multiclass prediction loss
-                if vnet is not None:
-                    cost_w = None if y is None else F.cross_entropy(input=y_hat, target=y, reduce=False)
-                    # cost_w = F.cross_entropy(y_f, target_var, reduce=False)
-                    cost_v = torch.reshape(cost_w, (len(cost_w), 1))
+                # predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='elementwise_mean')
+                predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='none')
 
-                    with torch.no_grad():
-                        w_new = vnet(cost_v)
-                    norm_v = torch.sum(w_new)
-
-                    if norm_v != 0:
-                        w_v = w_new / norm_v
-                    else:
-                        w_v = w_new
-
-                    predL = torch.sum(cost_v * w_v)
-                else:
-                    predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='elementwise_mean')
 
             # Weigh losses
             loss_cur = predL

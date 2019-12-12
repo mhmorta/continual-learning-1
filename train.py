@@ -52,11 +52,11 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
 
     vnet = None
     if use_vnet:
-        vnet =  vnet = VNet(1, 100, 1).to(device)
+        vnet = VNet(1, 100, 1).to(device)
 
-        optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
-                                      momentum=0.9, nesterov=True,
-                                      weight_decay=5e-4)
+    optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+                                  momentum=0.9, nesterov=True,
+                                  weight_decay=5e-4)
 
 
     # Loop over all tasks.
@@ -277,9 +277,14 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
                 # -------------------------------------------------
                 # ---------------- Meta Weight Net ----------------
                 if use_vnet:
+                    # ------------ Update meta-model ----------------
                     meta_model = copy.deepcopy(model).to(device)
-                    y_f_hat = meta_model(x)
-                    cost = F.cross_entropy(y_f_hat, y, reduce=False)
+
+                    input_var = to_var(x, requires_grad=False)
+                    target_var = to_var(y, requires_grad=False)
+
+                    y_f_hat = meta_model(input_var)
+                    cost = F.cross_entropy(y_f_hat, target_var, reduce=False)
                     cost_v = torch.reshape(cost, (len(cost), 1))
 
                     v_lambda = vnet(cost_v.data)
@@ -299,6 +304,8 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
                     meta_lr = 0.01
                     meta_model.update_params(lr_inner=meta_lr, source_params=grads)
                     del grads
+
+                    # -------------- update vnet ------------------
 
                     input_validation, target_validation = next(iter(train_meta_loader))
                     input_validation_var = to_var(input_validation, requires_grad=False)
