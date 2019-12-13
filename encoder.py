@@ -5,10 +5,11 @@ from exemplars import ExemplarHandler
 from continual_learner import ContinualLearner
 from replayer import Replayer
 import utils
+from vnet import MetaModule
 
 from sklearn.metrics import confusion_matrix
 
-class Classifier(ContinualLearner, Replayer, ExemplarHandler):
+class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
     '''Model for classifying images, "enriched" as "ContinualLearner"-, Replayer- and ExemplarHandler-object.'''
 
     def __init__(self, image_size, image_channels, classes,
@@ -65,7 +66,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         return self.fcE(self.flatten(images))
 
 
-    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1):
+    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1, vnet=None):
         '''Train model for one batch ([x],[y]), possibly supplemented with replayed data ([x_],[y_/scores_]).
 
         [x]               <tensor> batch of inputs (could be None, in which case only 'replayed' data is used)
@@ -118,7 +119,24 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
 
 
             # Calculate prediction loss
-            if self.binaryCE:
+            if vnet is not None:
+                # y_f = model(input_var)
+                cost_w = F.cross_entropy(y_hat, y, reduce=False)
+                cost_v = torch.reshape(cost_w, (len(cost_w), 1))
+                # prec_train = accuracy(y_f.data, target_var.data, topk=(1,))[0]
+
+                with torch.no_grad():
+                    w_new = vnet(cost_v)
+                norm_v = torch.sum(w_new)
+
+                if norm_v != 0:
+                    w_v = w_new / norm_v
+                else:
+                    w_v = w_new
+
+                predL = torch.sum(cost_v * w_v)
+
+            elif self.binaryCE:
                 # -binary prediction loss
                 binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
                 if self.binaryCE_distill and (scores is not None):

@@ -107,6 +107,9 @@ eval_params.add_argument('--prec-n', type=int, default=1024, help="# samples for
 eval_params.add_argument('--sample-log', type=int, default=500, metavar="N", help="# iters after which to plot samples")
 eval_params.add_argument('--sample-n', type=int, default=64, help="# images to show")
 
+# reweighting parameters
+eval_params = parser.add_argument_group('Reweighting Parameters')
+eval_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
 
 
 def run(args):
@@ -400,11 +403,12 @@ def run(args):
     start = time.time()
     # Train model
     train_cl(
-        model, train_datasets, replay_mode=args.replay, scenario=scenario, classes_per_task=classes_per_task,
+        model, train_datasets, test_datasets, replay_mode=args.replay, scenario=scenario, classes_per_task=classes_per_task,
         iters=args.iters, batch_size=args.batch,
         generator=generator, gen_iters=args.g_iters, gen_loss_cbs=generator_loss_cbs,
         sample_cbs=sample_cbs, eval_cbs=eval_cbs, loss_cbs=generator_loss_cbs if args.feedback else solver_loss_cbs,
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
+        use_vnet=args.vnet
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

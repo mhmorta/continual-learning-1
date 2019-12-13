@@ -8,12 +8,13 @@ import utils
 import time
 from data import SubDataset, ExemplarDataset
 from continual_learner import ContinualLearner
+from vnet import *
 
 
 
-def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
+def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
-             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list()):
+             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), use_vnet=False):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -23,7 +24,9 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
     [classes_per_task]  <int>, # of classes per task
     [iters]             <int>, # of optimization-steps (i.e., # of batches) per task
     [generator]         None or <nn.Module>, if a seperate generative model should be trained (for [gen_iters] per task)
-    [*_cbs]             <list> of call-back functions to evaluate training-progress'''
+    [*_cbs]             <list> of call-back functions to evaluate training-progress
+    [use_vnet] `        <bool> should it use vnet?
+    '''
 
 
     # Set model in training-mode
@@ -32,6 +35,12 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
     # Use cuda?
     cuda = model._is_on_cuda()
     device = model._device()
+
+    if use_vnet:
+        vnet = VNet(1, 128, 1).to(device)
+        optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+                                      momentum=0.9, nesterov=True,
+                                      weight_decay=0.0005)
 
     # Initiate possible sources for replay (no replay for 1st task)
     Exact = Generative = Current = False
@@ -46,6 +55,10 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
+        rand_sampler = torch.utils.data.RandomSampler(meta_datasets[task - 1], num_samples=64, replacement=True)
+        train_meta_loader = iter(cycle(utils.get_data_loader(
+            meta_datasets[task-1], 64, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
+        )))
 
         # If offline replay-setting, create large database of all tasks so far
         if replay_mode=="offline" and (not scenario=="task"):
@@ -242,10 +255,60 @@ def train_cl(model, train_datasets, replay_mode="none", scenario="class",classes
 
             #---> Train MAIN MODEL
             if batch_index <= iters:
+                # -----------------------------------------
+                if use_vnet:
+                    meta_model = copy.deepcopy(model)
+                    meta_model.train()
+                    vnet.train()
+                    # ----- Update meta-model -----
+                    input_var = to_var(x, requires_grad=False)
+                    target_var = to_var(y, requires_grad=False)
 
+                    # meta_model = build_model()
+
+                    meta_model.load_state_dict(model.state_dict())
+
+                    y_f_hat = meta_model(input_var)
+                    cost = F.cross_entropy(y_f_hat, target_var, reduce=False)
+                    cost_v = torch.reshape(cost, (len(cost), 1))
+
+                    v_lambda = vnet(cost_v.data)
+
+                    norm_c = torch.sum(v_lambda)
+
+                    if norm_c != 0:
+                        v_lambda_norm = v_lambda / norm_c
+                    else:
+                        v_lambda_norm = v_lambda
+
+                    l_f_meta = torch.sum(cost_v * v_lambda_norm)
+                    meta_model.zero_grad()
+                    grads = torch.autograd.grad(l_f_meta, (meta_model.params()), create_graph=True)
+                    # meta_lr = args.lr * ((0.1 ** int(iters >= 18000)) * (0.1 ** int(iters >= 19000)))  # For WRN-28-10
+                    meta_lr = 0.1
+                    # meta_lr = args.lr * ((0.1 ** int(iters >= 20000)) * (0.1 ** int(iters >= 25000)))  # For ResNet32
+                    meta_model.update_params(lr_inner=meta_lr, source_params=grads)
+                    del grads
+
+                    # --- update vnet ---
+
+                    input_validation, target_validation = next(iter(train_meta_loader))
+                    input_validation_var = to_var(input_validation, requires_grad=False)
+                    target_validation_var = to_var(target_validation.type(torch.LongTensor), requires_grad=False)
+
+                    y_g_hat = meta_model(input_validation_var)
+                    l_g_meta = F.cross_entropy(y_g_hat, target_validation_var)
+                    # prec_meta = accuracy(y_g_hat.data, target_validation_var.data, topk=(1,))[0]
+
+                    optimizer_c.zero_grad()
+                    l_g_meta.backward()
+                    optimizer_c.step()
+
+
+                # -----------------------------------------
                 # Train the main model with this batch
                 loss_dict = model.train_a_batch(x, y, x_=x_, y_=y_, scores=scores, scores_=scores_,
-                                                active_classes=active_classes, task=task, rnt = 1./task)
+                                                active_classes=active_classes, task=task, rnt = 1./task, vnet=vnet)
 
                 # Update running parameter importance estimates in W
                 if isinstance(model, ContinualLearner) and (model.si_c>0):
