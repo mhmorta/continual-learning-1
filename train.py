@@ -36,11 +36,6 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     cuda = model._is_on_cuda()
     device = model._device()
 
-    if use_vnet:
-        vnet = VNet(1, 128, 1).to(device)
-        optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
-                                      momentum=0.9, nesterov=True,
-                                      weight_decay=0.0005)
 
     # Initiate possible sources for replay (no replay for 1st task)
     Exact = Generative = Current = False
@@ -52,6 +47,15 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             if p.requires_grad:
                 n = n.replace('.', '__')
                 model.register_buffer('{}_SI_prev_task'.format(n), p.data.clone())
+
+    vnet = None
+    if use_vnet:
+        vnet = VNet(1, 100, 1).to(device)
+
+        optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+                                      momentum=0.9, nesterov=True,
+                                      weight_decay=5e-4)
+
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):

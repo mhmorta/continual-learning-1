@@ -135,7 +135,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
                     w_v = w_new
 
                 predL = torch.sum(cost_v * w_v)
-
+                # print(w_v)
             elif self.binaryCE:
                 # -binary prediction loss
                 binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
@@ -147,8 +147,9 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
                     input=y_hat, target=binary_targets, reduction='none'
                 ).sum(dim=1).mean()     #--> sum over classes, then average over batch
             else:
-                # -multiclass prediction loss
                 predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='elementwise_mean')
+                # predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='none')
+
 
             # Weigh losses
             loss_cur = predL
@@ -257,7 +258,8 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
             'pred': predL.item() if predL is not None else 0,
             'pred_r': sum(predL_r).item()/n_replays if (x_ is not None and predL_r[0] is not None) else 0,
             'distil_r': sum(distilL_r).item()/n_replays if (x_ is not None and distilL_r[0] is not None) else 0,
-            'ewc': ewc_loss.item(), 'si_loss': surrogate_loss.item(),
+            'ewc': ewc_loss.item(),
+            'si_loss': surrogate_loss.item(),
             'precision': precision if precision is not None else 0.,
         }
 

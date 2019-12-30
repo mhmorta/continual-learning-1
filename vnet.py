@@ -22,6 +22,9 @@ class MetaModule(nn.Module):
         for name, param in self.named_params(self):
             yield param
 
+    def parameters(self):
+        return self.params()
+
     def named_leaves(self):
         return []
 
@@ -59,7 +62,7 @@ class MetaModule(nn.Module):
                 if first_order:
                     grad = to_var(grad.detach().data)
                 tmp = param_t - lr_inner * grad
-                tmp =  torch.nn.Parameter(tmp)
+                # tmp =  torch.nn.Parameter(tmp, requires_grad=True)
                 self.set_param(self, name_t, tmp)
         else:
 

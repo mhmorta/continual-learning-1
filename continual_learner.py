@@ -32,10 +32,10 @@ class ContinualLearner(nn.Module, metaclass=abc.ABCMeta):
         self.EWC_task_count = 0 #-> keeps track of number of quadratic loss terms (for "offline EWC")
 
     def _device(self):
-        return next(self.parameters()).device
+        return next(self.params()).device
 
     def _is_on_cuda(self):
-        return next(self.parameters()).is_cuda
+        return next(self.params()).is_cuda
 
     @abc.abstractmethod
     def forward(self, x):
@@ -201,7 +201,7 @@ class ContinualLearner(nn.Module, metaclass=abc.ABCMeta):
         '''Calculate SI's surrogate loss.'''
         try:
             losses = []
-            for n, p in self.named_parameters():
+            for n, p in self.named_params():
                 if p.requires_grad:
                     # Retrieve previous parameter values and their normalized path integral (i.e., omega)
                     n = n.replace('.', '__')

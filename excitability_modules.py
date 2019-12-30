@@ -2,7 +2,12 @@ import math
 import torch
 from torch import nn
 from torch.nn.parameter import Parameter
+from torch.autograd import Variable
 
+def to_var(x, requires_grad=True):
+    if torch.cuda.is_available():
+        x = x.cuda()
+    return Variable(x, requires_grad=requires_grad)
 
 def linearExcitability(input, weight, excitability=None, bias=None):
     '''Applies a linear transformation to the incoming data: :math:`y = c(xA^T) + b`.
@@ -48,13 +53,20 @@ class LinearExcitability(nn.Module):
         super(LinearExcitability, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
+
+        # self.weight = Parameter(torch.Tensor(out_features, in_features))
+
+        ignore = nn.Linear(in_features, out_features)
+        self.register_buffer('weight', to_var(ignore.weight.data, requires_grad=True))
+
         if excitability:
             self.excitability = Parameter(torch.Tensor(out_features))
         else:
             self.register_parameter('excitability', None)
         if bias:
-            self.bias = Parameter(torch.Tensor(out_features))
+            # self.bias = Parameter(torch.Tensor(out_features))
+            self.register_buffer('bias', to_var(ignore.bias.data, requires_grad=True))
+
         else:
             self.register_parameter('bias', None)
         if excit_buffer:
@@ -84,6 +96,9 @@ class LinearExcitability(nn.Module):
         else:
             excitability = self.excitability*self.excit_buffer
         return linearExcitability(input, self.weight, excitability, self.bias)
+
+    def named_leaves(self):
+        return [('weight', self.weight), ('bias', self.bias)]
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
