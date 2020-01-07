@@ -1,8 +1,8 @@
 import abc
 from torch import nn
+from vnet import MetaModule
 
-
-class Replayer(nn.Module, metaclass=abc.ABCMeta):
+class Replayer(MetaModule, metaclass=abc.ABCMeta):
     '''Abstract  module for a classifier/generator that can be trained with replay.
 
     Initiates ability to reset state of optimizer between tasks.'''

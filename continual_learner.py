@@ -32,10 +32,10 @@ class ContinualLearner(nn.Module, metaclass=abc.ABCMeta):
         self.EWC_task_count = 0 #-> keeps track of number of quadratic loss terms (for "offline EWC")
 
     def _device(self):
-        return next(self.params()).device
+        return next(self.parameters()).device
 
     def _is_on_cuda(self):
-        return next(self.params()).is_cuda
+        return next(self.parameters()).is_cuda
 
     @abc.abstractmethod
     def forward(self, x):
