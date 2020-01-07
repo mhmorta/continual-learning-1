@@ -119,9 +119,20 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
 
 
             # Calculate prediction loss
-            if vnet is not None:
+            if vnet is not None and task >1:
                 # y_f = model(input_var)
-                cost_w = F.cross_entropy(y_hat, y, reduce=False)
+                # -binary prediction loss
+                binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
+                if self.binaryCE_distill and (scores is not None):
+                    classes_per_task = int(y_hat.size(1) / task)
+                    binary_targets = binary_targets[:, -(classes_per_task):]
+                    binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
+                cost_w = None if y is None else F.binary_cross_entropy_with_logits(
+                    input=y_hat, target=binary_targets, reduction='none'
+                )     #--> sum over classes, then average over batch
+                cost_w = cost_w.sum(dim=1)
+
+                # cost_w = F.cross_entropy(y_hat, y,reduction='none')
                 cost_v = torch.reshape(cost_w, (len(cost_w), 1))
                 # prec_train = accuracy(y_f.data, target_var.data, topk=(1,))[0]
 
@@ -135,7 +146,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
                     w_v = w_new
 
                 predL = torch.sum(cost_v * w_v)
-                # print(w_v)
+                # print("Original: [{:f}]\t vnet: [{:f}]".format(cost_w.mean(), predL))
             elif self.binaryCE:
                 # -binary prediction loss
                 binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)

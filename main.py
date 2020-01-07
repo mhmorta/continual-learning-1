@@ -111,6 +111,11 @@ eval_params.add_argument('--sample-n', type=int, default=64, help="# images to s
 eval_params = parser.add_argument_group('Reweighting Parameters')
 eval_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
 
+# dataloader parameters
+data_params = parser.add_argument_group('Data-related Parameters')
+data_params.add_argument('--imb_factor', type=float, default=1.0, help='imbalance factor')
+data_params.add_argument('--inverse', type=bool, default=False, help='Inverse imabalce data? (from minority class to the majority)')
+
 
 def run(args):
 
@@ -408,7 +413,7 @@ def run(args):
         generator=generator, gen_iters=args.g_iters, gen_loss_cbs=generator_loss_cbs,
         sample_cbs=sample_cbs, eval_cbs=eval_cbs, loss_cbs=generator_loss_cbs if args.feedback else solver_loss_cbs,
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
-        use_vnet=args.vnet
+        use_vnet=args.vnet, imb_factor = args.imb_factor, imb_inverse = args.inverse
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

@@ -11,10 +11,9 @@ from continual_learner import ContinualLearner
 from vnet import *
 
 
-
 def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
-             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), use_vnet=False):
+             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), use_vnet=False, imb_factor = 1.0, imb_inverse= False):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -26,6 +25,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     [generator]         None or <nn.Module>, if a seperate generative model should be trained (for [gen_iters] per task)
     [*_cbs]             <list> of call-back functions to evaluate training-progress
     [use_vnet] `        <bool> should it use vnet?
+    [imb_factor]        <float> imbalanced data factor
     '''
 
 
@@ -70,7 +70,31 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         # -but if "offline"+"task"-scenario: all tasks so far included in 'exact replay' & no current batch
         if replay_mode=="offline" and scenario == "task":
             Exact = True
-            previous_datasets = train_datasets
+            previous_datasets = train_datasets()
+
+        # --------------------
+        # Enforce imbalanced data factor to the train_dataset
+
+
+        if imb_factor < 1.0 and len(train_datasets) == 1:
+            classes_sub_datasets = []
+            samples_per_class = [int(np.floor(5000*((0.01)**(i / (10 - 1.0))))) for i in range(10) ]
+            print("samples per classes = ", samples_per_class)
+            final_dataset = None
+            for cls in range(10):
+                tmp = SubDataset(train_dataset,  sub_labels=[cls])
+                id = 9 - cls if imb_inverse else cls
+                tmp.sub_indeces = np.random.choice(tmp.sub_indeces, samples_per_class[id])
+                final_dataset = tmp if final_dataset is None else ConcatDataset([final_dataset, tmp])
+            print('final_dataset = ', len(final_dataset))
+            train_dataset = final_dataset
+
+        elif imb_factor < 1.0 and scenario is "class":
+            pow = len(train_datasets) - task if imb_inverse else (task -1)
+            ratio = (imb_factor**(pow / (len(train_datasets) - 1.0)))
+            num_samples = int(np.floor(ratio * len( train_dataset.sub_indeces)))
+            train_dataset.sub_indeces = np.random.choice(train_dataset.sub_indeces, num_samples)
+            print(len(train_dataset.sub_indeces))
 
         # Add exemplars (if available) to current dataset (if requested)
         if add_exemplars and task>1:
@@ -260,7 +284,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             #---> Train MAIN MODEL
             if batch_index <= iters:
                 # -----------------------------------------
-                if use_vnet:
+                if use_vnet and task >1:
                     meta_model = copy.deepcopy(model)
                     meta_model.train()
                     vnet.train()
@@ -304,9 +328,16 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     l_g_meta = F.cross_entropy(y_g_hat, target_validation_var)
                     # prec_meta = accuracy(y_g_hat.data, target_validation_var.data, topk=(1,))[0]
 
+                    prev = vnet.linear1.weight.clone().data
                     optimizer_c.zero_grad()
                     l_g_meta.backward()
                     optimizer_c.step()
+                    curr = vnet.linear1.weight.clone()
+                    eqq = torch.equal(prev, curr)
+                    diff = prev - curr
+                    diff = torch.abs(diff).sum()
+                    grad_sum = torch.abs(vnet.linear1.weight.grad).sum()
+                    diff = diff
 
 
                 # -----------------------------------------
