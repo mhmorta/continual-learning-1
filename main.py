@@ -41,6 +41,7 @@ loss_params.add_argument('--bce-distill', action='store_true', help='distilled l
 
 # model architecture parameters
 model_params = parser.add_argument_group('Model Parameters')
+model_params.add_argument('--model_type', type=str, default="fce", choices=["fce", "resnet32"])
 model_params.add_argument('--fc-layers', type=int, default=3, dest='fc_lay', help="# of fully-connected layers")
 model_params.add_argument('--fc-units', type=int, default=400, metavar="N", help="# of units in first fc-layers")
 model_params.add_argument('--fc-drop', type=float, default=0., help="dropout probability for fc-units")
@@ -108,8 +109,11 @@ eval_params.add_argument('--sample-log', type=int, default=500, metavar="N", hel
 eval_params.add_argument('--sample-n', type=int, default=64, help="# images to show")
 
 # reweighting parameters
-eval_params = parser.add_argument_group('Reweighting Parameters')
-eval_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
+reweighting_params = parser.add_argument_group('Reweighting Parameters')
+reweighting_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
+reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
+reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
+reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
 
 # dataloader parameters
 data_params = parser.add_argument_group('Data-related Parameters')
@@ -164,6 +168,9 @@ def run(args):
     if args.singlehead and args.scenario=="task":
         scenario="domain"
 
+    if args.tasks == 1:
+        args.vnet_enable_from = 1
+
     # If only want param-stamp, get it printed to screen and exit
     if hasattr(args, "get_stamp") and args.get_stamp:
         _ = get_param_stamp_from_args(args=args)
@@ -212,7 +219,7 @@ def run(args):
             image_size=config['size'], image_channels=config['channels'], classes=config['classes'],
             fc_layers=args.fc_lay, fc_units=args.fc_units, fc_drop=args.fc_drop, fc_nl=args.fc_nl,
             fc_bn=True if args.fc_bn=="yes" else False, excit_buffer=True if args.gating_prop>0 else False,
-            binaryCE=args.bce, binaryCE_distill=args.bce_distill,
+            binaryCE=args.bce, binaryCE_distill=args.bce_distill, model_type = args.model_type
         ).to(device)
 
     # Define optimizer (only include parameters that "requires_grad")
@@ -413,7 +420,8 @@ def run(args):
         generator=generator, gen_iters=args.g_iters, gen_loss_cbs=generator_loss_cbs,
         sample_cbs=sample_cbs, eval_cbs=eval_cbs, loss_cbs=generator_loss_cbs if args.feedback else solver_loss_cbs,
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
-        use_vnet=args.vnet, imb_factor = args.imb_factor, imb_inverse = args.inverse
+        use_vnet=args.vnet, imb_factor = args.imb_factor, imb_inverse = args.inverse, reset_vnet= args.reset_vnet,
+        reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

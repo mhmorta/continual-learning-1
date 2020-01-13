@@ -6,6 +6,8 @@ import tqdm
 import copy
 import utils
 import time
+import matplotlib.pyplot as plt
+
 from data import SubDataset, ExemplarDataset
 from continual_learner import ContinualLearner
 from vnet import *
@@ -13,7 +15,8 @@ from vnet import *
 
 def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
-             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), use_vnet=False, imb_factor = 1.0, imb_inverse= False):
+             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), use_vnet=False, imb_factor = 1.0,
+             imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -59,6 +62,20 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
+        # ----------- weight-net relate -----------
+        if use_vnet and reset_vnet:
+            vnet = VNet(1, 100, 1).to(device)
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+                                          momentum=0.9, nesterov=True,
+                                          weight_decay=5e-4)
+
+        if use_vnet and reset_vnet_optim:
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+                                          momentum=0.9, nesterov=True,
+                                          weight_decay=5e-4)
+            # optimizer_c = torch.optim.Adam(vnet.params(), betas=(0.9, 0.999))
+        # --------------------------------------------
+
         rand_sampler = torch.utils.data.RandomSampler(meta_datasets[task - 1], num_samples=64, replacement=True)
         train_meta_loader = iter(cycle(utils.get_data_loader(
             meta_datasets[task-1], 64, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
@@ -284,7 +301,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             #---> Train MAIN MODEL
             if batch_index <= iters:
                 # -----------------------------------------
-                if use_vnet and task >1:
+                if use_vnet and task > vnet_enable_from:
                     meta_model = copy.deepcopy(model)
                     meta_model.train()
                     vnet.train()
@@ -384,6 +401,34 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
 
         ##----------> UPON FINISHING EACH TASK...
+        # How is vnet trained?
+        if use_vnet and task > vnet_enable_from:
+            x = np.arange(0.00, 20.00, 0.1)
+            cost_v = torch.tensor(x).float().view(-1, 1).cuda()
+            v_lambda = vnet(cost_v)
+            norm_c = torch.sum(v_lambda)
+
+            if norm_c != 0:
+                v_lambda_norm = v_lambda / norm_c
+            else:
+                v_lambda_norm = v_lambda
+
+            l_f_meta_array = cost_v * v_lambda
+
+            fig, ax = plt.subplots()
+            ax.plot(x, l_f_meta_array.cpu().detach().numpy())
+            ax.plot(x, x)
+
+            ax.set(xlabel='loss', ylabel='value',
+                   title='vnet loss after task #' + str(task))
+            ax.grid()
+
+            address = "results/vnet/task{:d}.png".format(task)
+            fig.savefig(address)
+        # -------------------------------------------
+
+
+
 
         # Close progres-bar(s)
         progress.close()

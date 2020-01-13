@@ -5,7 +5,7 @@ from exemplars import ExemplarHandler
 from continual_learner import ContinualLearner
 from replayer import Replayer
 import utils
-from vnet import MetaModule
+from vnet import MetaModule, ResNet32
 
 from sklearn.metrics import confusion_matrix
 
@@ -14,7 +14,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
 
     def __init__(self, image_size, image_channels, classes,
                  fc_layers=3, fc_units=1000, fc_drop=0, fc_bn=True, fc_nl="relu", gated=False,
-                 bias=True, excitability=False, excit_buffer=False, binaryCE=False, binaryCE_distill=False):
+                 bias=True, excitability=False, excit_buffer=False, binaryCE=False, binaryCE_distill=False, model_type = 'fce'):
 
         # configurations
         super().__init__()
@@ -44,6 +44,10 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
 
         # classifier
         self.classifier = fc_layer(mlp_output_size, classes, excit_buffer=True, nl='none', drop=fc_drop)
+
+        if model_type =='resnet32':
+            model = ResNet32(num_classes=10, in_channels=3)
+            print('resnet')
 
 
     def list_init_layers(self):
