@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import math
 from torch.autograd import Variable
 import torch.nn.init as init
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def cycle(iterable):
@@ -268,6 +270,16 @@ class ResNet32(MetaModule):
 
         return nn.Sequential(*layers)
 
+    def feature_extractor(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = F.avg_pool2d(out, out.size()[3])
+        out = out.view(out.size(0), -1)
+        # out = self.linear(out)
+        return out
+
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
@@ -298,6 +310,11 @@ class VNet(MetaModule):
         out = self.linear2(x)
         return torch.sigmoid(out)
 
+    def loss_weights(self):
+        x = np.arange(0.00, 10.00, 0.1)
+        x = torch.tensor(x).float().view(-1, 1).cuda()
+        cost_v = self(x).cpu().detach()
+        return cost_v
 
 def unit_tests_vnet():
     model = VNet(1, 100, 2).to('cuda')
@@ -320,6 +337,27 @@ def unit_tests_vnet():
     curr = model.linear1.weight.clone()
     diff = torch.abs(prev - curr).sum()
     print(diff)
+
+def plot_vnet_weights(vnet):
+
+    # norm_c = torch.sum(v_lambda)
+    #
+    # if norm_c != 0:
+    #     v_lambda_norm = v_lambda / norm_c
+    # else:
+    #     v_lambda_norm = v_lambda
+    #
+    # l_f_meta_array = cost_v * v_lambda
+
+    fig, ax = plt.subplots()
+    ax.plot(x, v_lambda_norm.cpu().detach().numpy())
+
+    ax.set(xlabel='loss', ylabel='weight',
+           title='vnet loss after task #' + str(task))
+    ax.grid()
+
+    address = "results/vnet/task{:d}.png".format(task)
+    fig.savefig(address)
 
 
 

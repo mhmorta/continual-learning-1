@@ -113,7 +113,7 @@ reweighting_params = parser.add_argument_group('Reweighting Parameters')
 reweighting_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
 reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
 reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
-reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
+reweighting_params.add_argument('--vnet_enable_from', type=int, default=1, help="Running vnet from which task number?")
 
 # dataloader parameters
 data_params = parser.add_argument_group('Data-related Parameters')

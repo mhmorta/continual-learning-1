@@ -12,6 +12,21 @@ import numpy as np
 def open_pdf(full_path):
     return PdfPages(full_path)
 
+def plot_vnet(weight_list):
+    fig, ax = plt.subplots()
+    x = np.arange(0.00, 10.00, 0.1)
+
+    fig, ax = plt.subplots()
+    for id, weight in enumerate(weight_list, 1):
+        ax.plot(x, weight, label='Task {:d}'.format(id))
+
+    plt.legend(loc='best')
+
+    ax.set(xlabel='loss', ylabel='weights', title='vnet weights at the end of each task')
+    ax.grid()
+
+    address = "results/vnet/weights.png"
+    fig.savefig(address)
 
 def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):
     '''Plot images in [image_tensor] as a grid with [nrow] into [pdf].

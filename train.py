@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from data import SubDataset, ExemplarDataset
 from continual_learner import ContinualLearner
 from vnet import *
+from visual_plt import plot_vnet
 
 
 def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
@@ -58,6 +59,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
                                       momentum=0.9, nesterov=True,
                                       weight_decay=5e-4)
+
+        vnet_weights_list = []
 
 
     # Loop over all tasks.
@@ -301,7 +304,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             #---> Train MAIN MODEL
             if batch_index <= iters:
                 # -----------------------------------------
-                if use_vnet and task > vnet_enable_from:
+                if use_vnet and task >= vnet_enable_from:
                     meta_model = copy.deepcopy(model)
                     meta_model.train()
                     vnet.train()
@@ -402,29 +405,14 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
         ##----------> UPON FINISHING EACH TASK...
         # How is vnet trained?
-        if use_vnet and task > vnet_enable_from:
-            x = np.arange(0.00, 20.00, 0.1)
-            cost_v = torch.tensor(x).float().view(-1, 1).cuda()
-            v_lambda = vnet(cost_v)
-            norm_c = torch.sum(v_lambda)
+        if use_vnet and task >= vnet_enable_from:
+            vnet_weights_list.append(vnet.loss_weights())
 
-            if norm_c != 0:
-                v_lambda_norm = v_lambda / norm_c
-            else:
-                v_lambda_norm = v_lambda
+            # if it's the last task
+            if task == len(train_datasets):
+                plot_vnet(vnet_weights_list)
 
-            l_f_meta_array = cost_v * v_lambda
 
-            fig, ax = plt.subplots()
-            ax.plot(x, l_f_meta_array.cpu().detach().numpy())
-            ax.plot(x, x)
-
-            ax.set(xlabel='loss', ylabel='value',
-                   title='vnet loss after task #' + str(task))
-            ax.grid()
-
-            address = "results/vnet/task{:d}.png".format(task)
-            fig.savefig(address)
         # -------------------------------------------
 
 

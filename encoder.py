@@ -9,7 +9,7 @@ from vnet import MetaModule, ResNet32
 
 from sklearn.metrics import confusion_matrix
 
-class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
+class Classifier(ContinualLearner, Replayer, ExemplarHandler):
     '''Model for classifying images, "enriched" as "ContinualLearner"-, Replayer- and ExemplarHandler-object.'''
 
     def __init__(self, image_size, image_channels, classes,
@@ -18,6 +18,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
 
         # configurations
         super().__init__()
+        self.model_type = model_type
         self.classes = classes
         self.label = "Classifier"
         self.fc_layers = fc_layers
@@ -34,20 +35,23 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
         ######------SPECIFY MODEL------######
 
         # flatten image to 2D-tensor
-        self.flatten = utils.Flatten()
+        if model_type == 'fce':
+            self.flatten = utils.Flatten()
 
-        # fully connected hidden layers
-        self.fcE = MLP(input_size=image_channels*image_size**2, output_size=fc_units, layers=fc_layers-1,
-                       hid_size=fc_units, drop=fc_drop, batch_norm=fc_bn, nl=fc_nl, bias=bias,
-                       excitability=excitability, excit_buffer=excit_buffer, gated=gated)
-        mlp_output_size = fc_units if fc_layers>1 else image_channels*image_size**2
+            # fully connected hidden layers
+            self.fcE = MLP(input_size=image_channels*image_size**2, output_size=fc_units, layers=fc_layers-1,
+                           hid_size=fc_units, drop=fc_drop, batch_norm=fc_bn, nl=fc_nl, bias=bias,
+                           excitability=excitability, excit_buffer=excit_buffer, gated=gated)
+            mlp_output_size = fc_units if fc_layers>1 else image_channels*image_size**2
 
-        # classifier
-        self.classifier = fc_layer(mlp_output_size, classes, excit_buffer=True, nl='none', drop=fc_drop)
+            # classifier
+            self.classifier = fc_layer(mlp_output_size, classes, excit_buffer=True, nl='none', drop=fc_drop)
+            print('resnet classifier... ')
 
-        if model_type =='resnet32':
-            model = ResNet32(num_classes=10, in_channels=3)
-            print('resnet')
+
+        elif model_type =='resnet32':
+            self.classifier = ResNet32(num_classes=classes, in_channels=image_channels)
+            print('resnet classifier... ')
 
 
     def list_init_layers(self):
@@ -59,15 +63,15 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler, MetaModule):
 
     @property
     def name(self):
-        return "{}_c{}".format(self.fcE.name, self.classes)
+        return "{}_c{}".format(self.fcE.name, self.classes) if self.model_type is 'fce' else 'resnet32'
 
 
     def forward(self, x):
-        final_features = self.fcE(self.flatten(x))
+        final_features = self.fcE(self.flatten(x)) if self.model_type is 'fce' else x
         return self.classifier(final_features)
 
     def feature_extractor(self, images):
-        return self.fcE(self.flatten(images))
+        return self.fcE(self.flatten(images)) if self.model_type is 'fce' else self.classifier.feature_extractor(images)
 
 
     def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1, vnet=None):
