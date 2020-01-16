@@ -113,7 +113,10 @@ reweighting_params = parser.add_argument_group('Reweighting Parameters')
 reweighting_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
 reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
 reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
-reweighting_params.add_argument('--vnet_enable_from', type=int, default=1, help="Running vnet from which task number?")
+reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
+reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=50, help="Number of examples per class")
+building_strategies_choices = ['testset', 'trainingset', 'exemplar', 'none']
+reweighting_params.add_argument('--metadataset_building_strategy', type=str, default='testset', choices=building_strategies_choices)
 
 # dataloader parameters
 data_params = parser.add_argument_group('Data-related Parameters')
@@ -421,7 +424,8 @@ def run(args):
         sample_cbs=sample_cbs, eval_cbs=eval_cbs, loss_cbs=generator_loss_cbs if args.feedback else solver_loss_cbs,
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
         use_vnet=args.vnet, imb_factor = args.imb_factor, imb_inverse = args.inverse, reset_vnet= args.reset_vnet,
-        reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from
+        reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
+        vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

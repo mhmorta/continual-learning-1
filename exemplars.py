@@ -18,6 +18,7 @@ class ExemplarHandler(nn.Module, metaclass=abc.ABCMeta):
         # list with exemplar-sets
         self.exemplar_sets = []   #--> each exemplar_set is an <np.array> of N images with shape (N, Ch, H, W)
         self.exemplar_means = []
+        self.meta_data = []
         self.compute_means = True
 
         # settings
@@ -42,7 +43,7 @@ class ExemplarHandler(nn.Module, metaclass=abc.ABCMeta):
         for y, P_y in enumerate(self.exemplar_sets):
             self.exemplar_sets[y] = P_y[:m]
 
-    def construct_exemplar_set(self, dataset, n):
+    def construct_exemplar_set(self, dataset, n, meta_data = False):
         '''Construct set of [n] exemplars from [dataset] using 'herding'.
 
         Note that [dataset] should be from specific class; selected sets are added to [self.exemplar_sets] in order.'''
@@ -104,7 +105,10 @@ class ExemplarHandler(nn.Module, metaclass=abc.ABCMeta):
                 exemplar_set.append(dataset[k][0].numpy())
 
         # add this [exemplar_set] as a [n]x[ich]x[isz]x[isz] to the list of [exemplar_sets]
-        self.exemplar_sets.append(np.array(exemplar_set))
+        if meta_data:
+            self.meta_data.append(np.array(exemplar_set))
+        else:
+            self.exemplar_sets.append(np.array(exemplar_set))
 
         # set mode of model back
         self.train(mode=mode)

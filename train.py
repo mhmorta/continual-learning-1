@@ -8,7 +8,7 @@ import utils
 import time
 import matplotlib.pyplot as plt
 
-from data import SubDataset, ExemplarDataset
+from data import SubDataset, ExemplarDataset, MetaDataset
 from continual_learner import ContinualLearner
 from vnet import *
 from visual_plt import plot_vnet
@@ -17,7 +17,8 @@ from visual_plt import plot_vnet
 def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), use_vnet=False, imb_factor = 1.0,
-             imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2):
+             imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
+             metadataset_building_strategy = 'none'):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -56,11 +57,18 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     if use_vnet:
         vnet = VNet(1, 100, 1).to(device)
 
+        weight_dict = {}
+        weight_dict[0] = vnet.loss_weights()
+
+        plot_vnet(weight_dict, name="vnet_start")
+
         optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
                                       momentum=0.9, nesterov=True,
                                       weight_decay=5e-4)
 
-        vnet_weights_list = []
+        vnet_weights_dict = {}
+
+    metadata_list = []
 
 
     # Loop over all tasks.
@@ -78,11 +86,57 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                                           weight_decay=5e-4)
             # optimizer_c = torch.optim.Adam(vnet.params(), betas=(0.9, 0.999))
         # --------------------------------------------
+        new_classes = list(range(classes_per_task)) if scenario == "domain" else list(
+            range(classes_per_task * (task - 1),
+                  classes_per_task * task))
 
-        rand_sampler = torch.utils.data.RandomSampler(meta_datasets[task - 1], num_samples=64, replacement=True)
-        train_meta_loader = iter(cycle(utils.get_data_loader(
-            meta_datasets[task-1], 64, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
-        )))
+        if use_vnet and task >= vnet_enable_from:
+            if metadataset_building_strategy == 'trainingset':
+                # Adding to the meta_model dataset from the current data
+                for class_id in new_classes:
+                    # create new dataset containing only all examples of this class
+                    current_dataset = SubDataset(original_dataset=train_dataset, sub_labels=[class_id])
+                    # based on this dataset, construct new exemplar-set for this class
+                    model.construct_exemplar_set(dataset=current_dataset, n=vnet_exemplars_per_class, meta_data=True)
+
+                vnet_meta_dataset = ExemplarDataset(model.meta_data, target_transform=None)
+
+                train_meta_loader = iter(cycle(utils.get_data_loader(
+                    vnet_meta_dataset, 256, cuda=cuda, drop_last=False, shuffle=True
+                )))
+            elif metadataset_building_strategy == 'testset':
+                rand_sampler = torch.utils.data.RandomSampler(meta_datasets[task - 1], num_samples=64, replacement=True)
+                train_meta_loader = iter(cycle(utils.get_data_loader(
+                    meta_datasets[task-1], 64, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
+                )))
+            elif metadataset_building_strategy == 'exemplar' and len(model.exemplar_sets)>0:
+                num_classes = len(model.exemplar_sets)
+                meta_ds_list = []
+
+                for class_id in range(num_classes):
+                    indxs = np.random.choice(len(model.exemplar_sets[class_id]), vnet_exemplars_per_class)
+                    meta_ds_list.append(model.exemplar_sets[class_id][indxs])
+
+                for class_id in new_classes:
+                    # create new dataset containing only all examples of this class
+                    current_dataset = SubDataset(original_dataset=train_dataset, sub_labels=[class_id])
+                    # based on this dataset, construct new exemplar-set for this class
+                    model.construct_exemplar_set(dataset=current_dataset, n=vnet_exemplars_per_class, meta_data=True)
+
+                for l in model.meta_data:
+                    meta_ds_list.append(l)
+
+                model.meta_data = []
+
+                vnet_meta_dataset = ExemplarDataset(meta_ds_list, target_transform=None)
+
+                train_meta_loader = iter(cycle(utils.get_data_loader(
+                    vnet_meta_dataset, 256, cuda=cuda, drop_last=False, shuffle=True
+                )))
+
+        # ----------------------------------------
+
+
 
         # If offline replay-setting, create large database of all tasks so far
         if replay_mode=="offline" and (not scenario=="task"):
@@ -406,11 +460,11 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         ##----------> UPON FINISHING EACH TASK...
         # How is vnet trained?
         if use_vnet and task >= vnet_enable_from:
-            vnet_weights_list.append(vnet.loss_weights())
+            vnet_weights_dict[task]= vnet.loss_weights()
 
             # if it's the last task
             if task == len(train_datasets):
-                plot_vnet(vnet_weights_list)
+                plot_vnet(vnet_weights_dict)
 
 
         # -------------------------------------------

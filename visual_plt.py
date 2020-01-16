@@ -12,20 +12,20 @@ import numpy as np
 def open_pdf(full_path):
     return PdfPages(full_path)
 
-def plot_vnet(weight_list):
+def plot_vnet(weight_dict, name=None):
     fig, ax = plt.subplots()
     x = np.arange(0.00, 10.00, 0.1)
 
     fig, ax = plt.subplots()
-    for id, weight in enumerate(weight_list, 1):
+    for id, weight in weight_dict.items():
         ax.plot(x, weight, label='Task {:d}'.format(id))
 
     plt.legend(loc='best')
 
-    ax.set(xlabel='loss', ylabel='weights', title='vnet weights at the end of each task')
+    ax.set(xlabel='loss', ylabel='weights')
     ax.grid()
 
-    address = "results/vnet/weights.png"
+    address = "results/vnet/weights.png" if name is None else "results/vnet/{}.png".format(name)
     fig.savefig(address)
 
 def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):
