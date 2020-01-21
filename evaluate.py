@@ -3,6 +3,7 @@ import torch
 import visual_visdom
 import visual_plt
 import utils
+from sklearn.metrics import confusion_matrix
 
 
 ####--------------------------------------------------------------------------------------------------------------####
@@ -33,6 +34,11 @@ def validate(model, dataset, batch_size=128, test_size=1024, verbose=True, allow
     # Loop over batches in [dataset]
     data_loader = utils.get_data_loader(dataset, batch_size, cuda=model._is_on_cuda())
     total_tested = total_correct = 0
+
+    # To compute confusion-matrix per task
+    labels_list = []
+    predicted_list = []
+
     for data, labels in data_loader:
         # -break on [test_size] (if "None", full dataset is used)
         if test_size:
@@ -53,12 +59,20 @@ def validate(model, dataset, batch_size=128, test_size=1024, verbose=True, allow
         # -update statistics
         total_correct += (predicted == labels).sum().item()
         total_tested += len(data)
+
+        labels_list.append(labels.view(-1))
+        predicted_list.append(predicted.view(-1))
     precision = total_correct / total_tested
 
     # Set model back to its initial mode, print result on screen (if requested) and return it
     model.train(mode=mode)
     if verbose:
-        print('=> precision: {:.3f}'.format(precision))
+        print('=> accuracy: {:.3f}'.format(precision))
+
+        labels_list = torch.cat(labels_list, dim=0).cpu()
+        predicted_list = torch.cat(predicted_list, dim=0).cpu()
+        print(confusion_matrix(labels_list, predicted_list, labels=range(10)))
+
     return precision
 
 

@@ -82,7 +82,7 @@ def loss_fn_kd_binary(scores, target_scores, T=2.):
 ## Data-handling functions ##
 #############################
 
-def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None, drop_last=False, augment=False, sampler= None, shuffle=False):
+def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None, drop_last=False, augment=False, sampler= None, shuffle=True):
     '''Return <DataLoader>-object for the provided <DataSet>-object [dataset].'''
 
     # If requested, make copy of original dataset to add augmenting transform (without altering original dataset)

@@ -12,8 +12,43 @@ import numpy as np
 def open_pdf(full_path):
     return PdfPages(full_path)
 
-def plot_vnet(weight_dict, name=None):
+def plot_losses(model_loss, model_vnet_loss, loss_original):
+    if len(model_loss) > 0:
+        fig, ax = plt.subplots()
+        x = np.arange(1, len(model_loss)+0.1)
+        ax.plot(x, model_loss, label='Model\'s loss')
+        ax.plot(x, model_vnet_loss, label='vnet\'s loss')
+        plt.legend(loc='best')
+
+        ax.set(xlabel='Iteration', ylabel='loss value')
+        plt.title('Loss plot')
+        fig.savefig("results/vnet/losses.png")
+
+def plot_class_weights(weight_dict, task):
     fig, ax = plt.subplots()
+
+    max_len = 0
+    # For the JT case
+    if task == 1:
+        x = np.arange(1, 10.01)
+        y = []
+        for i in range(10):
+            y.append(weight_dict[i])
+        ax.plot(x, y, '.-')
+
+    else:
+        for cls, weights in weight_dict.items():
+            max_len = len(weights) if len(weights) > max_len else max_len
+            x = np.arange(max_len - len(weights) + 1, max_len +1)
+            ax.plot( x, weights, '.-', label='Class {:d}'.format(cls))
+
+    plt.legend(loc='best')
+
+    ax.set(xlabel='Task', ylabel='Class weights')
+    plt.title('Class weights by vnet')
+    fig.savefig("results/vnet/class_weights.png")
+
+def plot_vnet(weight_dict, name=None):
     x = np.arange(0.00, 10.00, 0.1)
 
     fig, ax = plt.subplots()
@@ -24,6 +59,7 @@ def plot_vnet(weight_dict, name=None):
 
     ax.set(xlabel='loss', ylabel='weights')
     ax.grid()
+    plt.title('Weight score per loss value')
 
     address = "results/vnet/weights.png" if name is None else "results/vnet/{}.png".format(name)
     fig.savefig(address)

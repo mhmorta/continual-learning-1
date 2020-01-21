@@ -74,7 +74,8 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         return self.fcE(self.flatten(images)) if self.model_type is 'fce' else self.classifier.feature_extractor(images)
 
 
-    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None, task=1, vnet=None):
+    def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None,
+                      task=1, vnet=None, use_vnet_for_loss=False, loss_weights=None):
         '''Train model for one batch ([x],[y]), possibly supplemented with replayed data ([x_],[y_/scores_]).
 
         [x]               <tensor> batch of inputs (could be None, in which case only 'replayed' data is used)
@@ -94,6 +95,8 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
         # Reset optimizer
         self.optimizer.zero_grad()
 
+        predL_vnet = None
+        predL_original = None
 
         ##--(1)-- CURRENT DATA --##
 
@@ -127,20 +130,36 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
 
 
             # Calculate prediction loss
-            if vnet is not None and task >1:
-                # y_f = model(input_var)
-                # -binary prediction loss
-                binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
-                if self.binaryCE_distill and (scores is not None):
-                    classes_per_task = int(y_hat.size(1) / task)
-                    binary_targets = binary_targets[:, -(classes_per_task):]
-                    binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
-                cost_w = None if y is None else F.binary_cross_entropy_with_logits(
-                    input=y_hat, target=binary_targets, reduction='none'
-                )     #--> sum over classes, then average over batch
-                cost_w = cost_w.sum(dim=1)
+            # weighted loss
+            if loss_weights is not None:
+                predL = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='mean', weight=loss_weights)
+            # or vnet
+            elif use_vnet_for_loss:
+                # For JT case
+                if task == 1:
+                    # cost_w = F.cross_entropy(y_hat, y,reduction='none')
+                    binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
+                    if self.binaryCE_distill and (scores is not None):
+                        classes_per_task = int(y_hat.size(1) / task)
+                        binary_targets = binary_targets[:, -(classes_per_task):]
+                        binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
+                    cost_w = None if y is None else F.binary_cross_entropy_with_logits(
+                        input=y_hat, target=binary_targets, reduction='none'
+                    )     #--> sum over classes, then average over batch
+                    cost_w = cost_w.sum(dim=1)
+                elif task > 1:
+                    # y_f = model(input_var)
+                    # -binary prediction loss
+                    binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
+                    if self.binaryCE_distill and (scores is not None):
+                        classes_per_task = int(y_hat.size(1) / task)
+                        binary_targets = binary_targets[:, -(classes_per_task):]
+                        binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
+                    cost_w = None if y is None else F.binary_cross_entropy_with_logits(
+                        input=y_hat, target=binary_targets, reduction='none'
+                    )     #--> sum over classes, then average over batch
+                    cost_w = cost_w.sum(dim=1)
 
-                # cost_w = F.cross_entropy(y_hat, y,reduction='none')
                 cost_v = torch.reshape(cost_w, (len(cost_w), 1))
                 # prec_train = accuracy(y_f.data, target_var.data, topk=(1,))[0]
 
@@ -153,7 +172,14 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
                 else:
                     w_v = w_new
 
-                predL = torch.sum(cost_v * w_v)
+                predL_vnet = torch.sum(cost_v * w_v)
+                # print(predL_vnet)
+                # if torch.isnan(predL_vnet).item():
+                #     print('NaN: {}'.format(predL_vnet.item()))
+                predL_original = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='mean')
+                predL = 0.5 * predL_original + 0.5 *predL_vnet
+                # predL = predL_vnet
+
                 # print("Original: [{:f}]\t vnet: [{:f}]".format(cost_w.mean(), predL))
             elif self.binaryCE:
                 # -binary prediction loss
@@ -274,6 +300,8 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
             'loss_total': loss_total.item(),
             'loss_current': loss_cur.item() if x is not None else 0,
             'loss_replay': loss_replay.item() if (loss_replay is not None) and (x is not None) else 0,
+            'loss_vnet': predL_vnet.item() if (predL_vnet is not None) else None,
+            'loss_original': predL_original.item() if (predL_original is not None) else None,
             'pred': predL.item() if predL is not None else 0,
             'pred_r': sum(predL_r).item()/n_replays if (x_ is not None and predL_r[0] is not None) else 0,
             'distil_r': sum(distilL_r).item()/n_replays if (x_ is not None and distilL_r[0] is not None) else 0,

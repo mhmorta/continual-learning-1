@@ -55,7 +55,7 @@ train_params = parser.add_argument_group('Training Parameters')
 train_params.add_argument('--iters', type=int, default=2000, help="# batches to optimize solver")
 train_params.add_argument('--lr', type=float, default=0.001, help="learning rate")
 train_params.add_argument('--batch', type=int, default=128, help="batch-size")
-train_params.add_argument('--optimizer', type=str, choices=['adam', 'adam_reset', 'sgd'], default='adam')
+train_params.add_argument('--optimizer', type=str, choices=['adam', 'adam_reset', 'sgd', 'sgd_momentum'], default='adam')
 
 # "memory replay" parameters
 replay_params = parser.add_argument_group('Replay Parameters')
@@ -117,6 +117,7 @@ reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help=
 reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=50, help="Number of examples per class")
 building_strategies_choices = ['testset', 'trainingset', 'exemplar', 'none']
 reweighting_params.add_argument('--metadataset_building_strategy', type=str, default='testset', choices=building_strategies_choices)
+reweighting_params.add_argument('--weighted_ce', type=bool, default=False, help="Using weighted cross-entropy?")
 
 # dataloader parameters
 data_params = parser.add_argument_group('Data-related Parameters')
@@ -171,8 +172,6 @@ def run(args):
     if args.singlehead and args.scenario=="task":
         scenario="domain"
 
-    if args.tasks == 1:
-        args.vnet_enable_from = 1
 
     # If only want param-stamp, get it printed to screen and exit
     if hasattr(args, "get_stamp") and args.get_stamp:
@@ -232,6 +231,10 @@ def run(args):
         model.optimizer = optim.Adam(model.optim_list, betas=(0.9, 0.999))
     elif model.optim_type=="sgd":
         model.optimizer = optim.SGD(model.optim_list)
+    elif model.optim_type=="sgd_momentum":
+        model.optimizer = optim.SGD(model.params(), 0.1,
+                                  momentum=0.9, nesterov=True,
+                                  weight_decay=0.0005)
     else:
         raise ValueError("Unrecognized optimizer, '{}' is not currently a valid option".format(args.optimizer))
 
@@ -406,6 +409,15 @@ def run(args):
     eval_cbs = [eval_cb, eval_cb_full]
     eval_cbs_exemplars = [eval_cb_exemplars]
 
+    #-------------------------------------------------------------------------------------------------#
+
+    #--------------------#
+    #----- JT TRAINING -----#
+    #--------------------#
+
+    if args.tasks == 1:
+        args.vnet_enable_from = 1
+        model.herding = args.herding
 
     #-------------------------------------------------------------------------------------------------#
 
@@ -425,7 +437,8 @@ def run(args):
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
         use_vnet=args.vnet, imb_factor = args.imb_factor, imb_inverse = args.inverse, reset_vnet= args.reset_vnet,
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
-        vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy
+        vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
+        weighted_ce = args.weighted_ce
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start
@@ -444,14 +457,14 @@ def run(args):
 
     # Evaluate precision of final model on full test-set
     precs = [evaluate.validate(
-        model, test_datasets[i], verbose=False, test_size=None, task=i+1, with_exemplars=False,
+        model, test_datasets[i], verbose=True, test_size=None, task=i+1, with_exemplars=False,
         allowed_classes=list(range(classes_per_task*i, classes_per_task*(i+1))) if scenario=="task" else None
     ) for i in range(args.tasks)]
-    print("\n Precision on test-set (softmax classification):")
+    print("\n Accuracy on test-set (softmax classification):")
     for i in range(args.tasks):
         print(" - Task {}: {:.4f}".format(i + 1, precs[i]))
     average_precs = sum(precs) / args.tasks
-    print('=> average precision over all {} tasks: {:.4f}'.format(args.tasks, average_precs))
+    print('=> average accuracy over all {} tasks: {:.4f}'.format(args.tasks, average_precs))
 
     # -with exemplars
     if args.use_exemplars:
@@ -459,11 +472,11 @@ def run(args):
             model, test_datasets[i], verbose=False, test_size=None, task=i+1, with_exemplars=True,
             allowed_classes=list(range(classes_per_task*i, classes_per_task*(i+1))) if scenario=="task" else None
         ) for i in range(args.tasks)]
-        print("\n Precision on test-set (classification using exemplars):")
+        print("\n Accuracy on test-set (classification using exemplars):")
         for i in range(args.tasks):
             print(" - Task {}: {:.4f}".format(i + 1, precs[i]))
         average_precs_ex = sum(precs) / args.tasks
-        print('=> average precision over all {} tasks: {:.4f}'.format(args.tasks, average_precs_ex))
+        print('=> average accuracy over all {} tasks: {:.4f}'.format(args.tasks, average_precs_ex))
     print("\n")
 
 
