@@ -12,7 +12,7 @@ import numpy as np
 def open_pdf(full_path):
     return PdfPages(full_path)
 
-def plot_losses(model_loss, model_vnet_loss, loss_original):
+def plot_losses(vnet_dir, model_loss, model_vnet_loss, loss_original):
     if len(model_loss) > 0:
         fig, ax = plt.subplots()
         x = np.arange(1, len(model_loss)+0.1)
@@ -22,9 +22,9 @@ def plot_losses(model_loss, model_vnet_loss, loss_original):
 
         ax.set(xlabel='Iteration', ylabel='loss value')
         plt.title('Loss plot')
-        fig.savefig("results/vnet/losses.png")
+        fig.savefig("{}/losses.png".format(vnet_dir))
 
-def plot_class_weights(weight_dict, task):
+def plot_class_weights(vnet_dir, weight_dict, task):
     fig, ax = plt.subplots()
 
     max_len = 0
@@ -46,9 +46,9 @@ def plot_class_weights(weight_dict, task):
 
     ax.set(xlabel='Task', ylabel='Class weights')
     plt.title('Class weights by vnet')
-    fig.savefig("results/vnet/class_weights.png")
+    fig.savefig("{}/class_weights.png".format(vnet_dir))
 
-def plot_vnet(weight_dict, name=None):
+def plot_vnet(vnet_dir, weight_dict, name=None):
     x = np.arange(0.00, 10.00, 0.1)
 
     fig, ax = plt.subplots()
@@ -61,7 +61,7 @@ def plot_vnet(weight_dict, name=None):
     ax.grid()
     plt.title('Weight score per loss value')
 
-    address = "results/vnet/weights.png" if name is None else "results/vnet/{}.png".format(name)
+    address = "{}/weights.png".format(vnet_dir) if name is None else "{}/{}.png".format(vnet_dir,name)
     fig.savefig(address)
 
 def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):

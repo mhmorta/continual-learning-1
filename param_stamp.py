@@ -123,9 +123,34 @@ def get_param_stamp(args, model_name, verbose=True, replay=False, replay_model_n
     if hasattr(args, 'bce') and args.bce:
         binLoss_stamp = '--BCE_dist' if (args.bce_distill and args.scenario=="class") else '--BCE'
 
+    # -for imbalanced data
+    imb_stamp = ""
+    if args.imb_factor < 1.0:
+        imb_factor = "{}".format(args.imb_factor)
+        inverse_stamp = "inv" if args.imb_inv else ""
+        imb_stamp = "--imb{}{}".format(imb_factor, inverse_stamp)
+
+    # -for reweighting strategies
+    reweighting_stamp = ""
+    if args.reweighting_strategy != 'none':
+        strategy_stamp = "{}".format(args.reweighting_strategy)
+        vnet_stamp = ""
+        if strategy_stamp=='vnet':
+            vnet_stamp = "{}{}{}{}{}".format('_l' + str(args.vnet_loss_ration),
+                                           '_e' + str(args.vnet_enable_from),
+                                           '_' + args.metadataset_building_strategy,
+                                           '_' + str(args.vnet_exemplars_per_class) if args.metadataset_building_strategy=='trainingset' else "",
+                                           '_' + args.vnet_opt
+                                           )
+        reweighting_stamp = "--{}{}".format(strategy_stamp, vnet_stamp)
+
+
+
+
+
     # --> combine
-    param_stamp = "{}--{}--{}{}{}{}{}{}{}".format(
-        task_stamp, model_stamp, hyper_stamp, ewc_stamp, xdg_stamp, replay_stamp, exemplar_stamp, binLoss_stamp,
+    param_stamp = "{}--{}--{}{}{}{}{}{}{}{}{}".format(
+        task_stamp, model_stamp, hyper_stamp, ewc_stamp, xdg_stamp, replay_stamp, exemplar_stamp, binLoss_stamp, imb_stamp, reweighting_stamp,
         "-s{}".format(args.seed) if not args.seed==0 else "",
     )
 

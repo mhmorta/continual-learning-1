@@ -24,7 +24,7 @@ parser.add_argument('--get-stamp', action='store_true', help='print param-stamp 
 parser.add_argument('--seed', type=int, default=0, help='random seed (for each random-module used)')
 parser.add_argument('--no-gpus', action='store_false', dest='cuda', help="don't use GPUs")
 parser.add_argument('--data-dir', type=str, default='./datasets', dest='d_dir', help="default: %(default)s")
-parser.add_argument('--plot-dir', type=str, default='./plots', dest='p_dir', help="default: %(default)s")
+parser.add_argument('--plot-dir', type=str, default='./results', dest='p_dir', help="default: %(default)s")
 parser.add_argument('--results-dir', type=str, default='./results', dest='r_dir', help="default: %(default)s")
 
 # expirimental task parameters
@@ -110,19 +110,23 @@ eval_params.add_argument('--sample-n', type=int, default=64, help="# images to s
 
 # reweighting parameters
 reweighting_params = parser.add_argument_group('Reweighting Parameters')
-reweighting_params.add_argument('--vnet', type=bool, default=False, help="using vnet?")
-reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
-reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
+reweighting_strategies_choices = ['vnet', 'weighted_ce', 'none']
+reweighting_params.add_argument('--reweighting_strategy', type=str, default='none', choices=reweighting_strategies_choices, help='Reweighting strategy from none, weighted_CE, or vnet')
+reweighting_params.add_argument('--vnet_loss_ration', type=float, default=0.5, help="Ratio of vnet in the loss")
 reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
-reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=50, help="Number of examples per class")
 building_strategies_choices = ['testset', 'trainingset', 'exemplar', 'none']
 reweighting_params.add_argument('--metadataset_building_strategy', type=str, default='testset', choices=building_strategies_choices)
-reweighting_params.add_argument('--weighted_ce', type=bool, default=False, help="Using weighted cross-entropy?")
+reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=50, help="Number of examples per class")
+vnet_optimizer_choices = ['sgd', 'sgd_momentum', 'adam']
+reweighting_params.add_argument('--vnet_opt', type=str, default='sgd_momentum', choices=vnet_optimizer_choices)
+
+reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
+reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
 
 # dataloader parameters
 data_params = parser.add_argument_group('Data-related Parameters')
 data_params.add_argument('--imb_factor', type=float, default=1.0, help='imbalance factor')
-data_params.add_argument('--inverse', type=bool, default=False, help='Inverse imabalce data? (from minority class to the majority)')
+data_params.add_argument('--imb_inv', type=bool, default=False, help='Inverse imabalce data? (from minority class to the majority)')
 
 
 def run(args):
@@ -333,6 +337,15 @@ def run(args):
         replay_model_name=generator.name if (args.replay=="generative" and not args.feedback) else None,
     )
 
+    if not os.path.isdir("{}/{}".format(args.r_dir, param_stamp)):
+        os.mkdir("{}/{}".format(args.r_dir, param_stamp))
+
+    vnet_dir = ''
+    if args.reweighting_strategy=='vnet':
+        vnet_dir = "{}/{}/vnet".format(args.r_dir, param_stamp)
+        if not os.path.isdir(vnet_dir):
+            os.mkdir(vnet_dir)
+
     # Print some model-characteristics on the screen
     # -main model
     print("\n")
@@ -435,14 +448,14 @@ def run(args):
         generator=generator, gen_iters=args.g_iters, gen_loss_cbs=generator_loss_cbs,
         sample_cbs=sample_cbs, eval_cbs=eval_cbs, loss_cbs=generator_loss_cbs if args.feedback else solver_loss_cbs,
         eval_cbs_exemplars=eval_cbs_exemplars, use_exemplars=args.use_exemplars, add_exemplars=args.add_exemplars,
-        use_vnet=args.vnet, imb_factor = args.imb_factor, imb_inverse = args.inverse, reset_vnet= args.reset_vnet,
+        imb_factor = args.imb_factor, imb_inverse = args.imb_inv, reset_vnet= args.reset_vnet,
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
         vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
-        weighted_ce = args.weighted_ce
+        imb_strategy = args.reweighting_strategy, vnet_loss_ration=args.vnet_loss_ration, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start
-    time_file = open("{}/time-{}.txt".format(args.r_dir, param_stamp), 'w')
+    time_file = open("{}/{}/time.txt".format(args.r_dir, param_stamp), 'w')
     time_file.write('{}\n'.format(training_time))
     time_file.close()
 
@@ -487,20 +500,20 @@ def run(args):
     #------------------#
 
     # Average precision on full test set
-    output_file = open("{}/prec-{}.txt".format(args.r_dir, param_stamp), 'w')
+    output_file = open("{}/{}/prec.txt".format(args.r_dir, param_stamp), 'w')
     output_file.write('{}\n'.format(average_precs_ex if args.use_exemplars else average_precs))
     output_file.close()
     # -precision-dict
-    file_name = "{}/dict-{}".format(args.r_dir, param_stamp)
+    file_name = "{}/{}/dict".format(args.r_dir, param_stamp)
     utils.save_object(precision_dict_exemplars if args.use_exemplars else precision_dict, file_name)
 
     # Average precision on full test set not evaluated using exemplars (i.e., using softmax on final layer)
     if args.use_exemplars:
-        output_file = open("{}/prec_noex-{}.txt".format(args.r_dir, param_stamp), 'w')
+        output_file = open("{}/{}/prec_noex.txt".format(args.r_dir, param_stamp), 'w')
         output_file.write('{}\n'.format(average_precs))
         output_file.close()
         # -precision-dict:
-        file_name = "{}/dict_noex-{}".format(args.r_dir, param_stamp)
+        file_name = "{}/{}/dict_noex".format(args.r_dir, param_stamp)
         utils.save_object(precision_dict, file_name)
 
 
@@ -513,7 +526,7 @@ def run(args):
     # If requested, generate pdf
     if args.pdf:
         # -open pdf
-        pp = visual_plt.open_pdf("{}/{}.pdf".format(args.p_dir, param_stamp))
+        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.p_dir, param_stamp))
 
         # -show samples and reconstructions (either from main model or from separate generator)
         if args.feedback or args.replay=="generative":
