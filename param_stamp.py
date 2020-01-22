@@ -136,7 +136,7 @@ def get_param_stamp(args, model_name, verbose=True, replay=False, replay_model_n
         strategy_stamp = "{}".format(args.reweighting_strategy)
         vnet_stamp = ""
         if strategy_stamp=='vnet':
-            vnet_stamp = "{}{}{}{}{}".format('_l' + str(args.vnet_loss_ration),
+            vnet_stamp = "{}{}{}{}{}".format('_l' + str(args.vnet_loss_ratio),
                                            '_e' + str(args.vnet_enable_from),
                                            '_' + args.metadataset_building_strategy,
                                            '_' + str(args.vnet_exemplars_per_class) if args.metadataset_building_strategy=='trainingset' else "",

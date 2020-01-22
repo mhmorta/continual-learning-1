@@ -19,7 +19,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), imb_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
-             metadataset_building_strategy = 'none', weighted_ce = False, vnet_loss_ration=0.5, vnet_opt=None, vnet_dir = ""):
+             metadataset_building_strategy = 'none', weighted_ce = False, vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = ""):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -175,7 +175,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         # Creating trainingset data loader for JT case
         if imb_factor < 1.0 and len(train_datasets) == 1:
             classes_sub_datasets = []
-            samples_per_class = [int(np.floor(5000*((0.01)**(i / (10 - 1.0))))) for i in range(10) ]
+            samples_per_class = [int(np.floor(5000*((imb_factor)**(i / (10 - 1.0))))) for i in range(10) ]
             if weighted_ce:
                 summ = sum(samples_per_class)
                 CE_weights = torch.FloatTensor([((summ - samples_per_class[i])/summ) for i in range(len(samples_per_class))]).to(device)
@@ -440,7 +440,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 loss_dict = model.train_a_batch(x, y, x_=x_, y_=y_,
                                                 scores=scores, scores_=scores_,
                                                 active_classes=active_classes, task=task, rnt = 1./task, vnet=vnet,
-                                                use_vnet_for_loss=use_vnet_for_loss, loss_weights = CE_weights, vnet_loss_ration=vnet_loss_ration)
+                                                use_vnet_for_loss=use_vnet_for_loss, loss_weights = CE_weights, vnet_loss_ratio=vnet_loss_ratio)
 
                 if imb_strategy=='vnet':
                     loss_list.append(loss_dict['loss_current'])

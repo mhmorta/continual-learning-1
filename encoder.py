@@ -75,7 +75,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
 
 
     def train_a_batch(self, x, y, scores=None, x_=None, y_=None, scores_=None, rnt=0.5, active_classes=None,
-                      task=1, vnet=None, use_vnet_for_loss=False, loss_weights=None, vnet_loss_ration=0.5):
+                      task=1, vnet=None, use_vnet_for_loss=False, loss_weights=None, vnet_loss_ratio=0.5):
         '''Train model for one batch ([x],[y]), possibly supplemented with replayed data ([x_],[y_/scores_]).
 
         [x]               <tensor> batch of inputs (could be None, in which case only 'replayed' data is used)
@@ -177,7 +177,7 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
                 # if torch.isnan(predL_vnet).item():
                 #     print('NaN: {}'.format(predL_vnet.item()))
                 predL_original = None if y is None else F.cross_entropy(input=y_hat, target=y, reduction='mean')
-                predL = (1.0 - vnet_loss_ration) * predL_original + vnet_loss_ration *predL_vnet
+                predL = (1.0 - vnet_loss_ratio) * predL_original + vnet_loss_ratio *predL_vnet
                 # predL = predL_vnet
 
                 # print("Original: [{:f}]\t vnet: [{:f}]".format(cost_w.mean(), predL))
