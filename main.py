@@ -112,7 +112,7 @@ eval_params.add_argument('--sample-n', type=int, default=64, help="# images to s
 reweighting_params = parser.add_argument_group('Reweighting Parameters')
 reweighting_strategies_choices = ['vnet', 'weighted_ce', 'none']
 reweighting_params.add_argument('--reweighting_strategy', type=str, default='none', choices=reweighting_strategies_choices, help='Reweighting strategy from none, weighted_CE, or vnet')
-reweighting_params.add_argument('--vnet_loss_ration', type=float, default=0.5, help="Ratio of vnet in the loss")
+reweighting_params.add_argument('--vnet_loss_ratio', type=float, default=0.5, help="Ratio of vnet in the loss")
 reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
 building_strategies_choices = ['testset', 'trainingset', 'exemplar', 'none']
 reweighting_params.add_argument('--metadataset_building_strategy', type=str, default='testset', choices=building_strategies_choices)
@@ -451,7 +451,7 @@ def run(args):
         imb_factor = args.imb_factor, imb_inverse = args.imb_inv, reset_vnet= args.reset_vnet,
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
         vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
-        imb_strategy = args.reweighting_strategy, vnet_loss_ration=args.vnet_loss_ration, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir
+        imb_strategy = args.reweighting_strategy, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start
