@@ -67,7 +67,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         plot_vnet(vnet_dir, weight_dict, name="start")
 
         if vnet_opt=='sgd_momentum':
-            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-5,
                                           momentum=0.9, nesterov=True,
                                           weight_decay=5e-4)
         elif vnet_opt=='sgd':
@@ -86,6 +86,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         loss_list = []
         vnet_loss_list = []
         loss_original_list = []
+
+        torch.backends.cudnn.benchmark = True
 
     metadata_list = []
     CE_weights = None

@@ -234,14 +234,14 @@ def run(args):
         ).to(device)
 
     # Define optimizer (only include parameters that "requires_grad")
-    model.optim_list = [{'params': filter(lambda p: p.requires_grad, model.parameters()), 'lr': args.lr}]
+    model.optim_list = [{'params': filter(lambda p: p.requires_grad, model.params()), 'lr': args.lr}]
     model.optim_type = args.optimizer
     if model.optim_type in ("adam", "adam_reset"):
         model.optimizer = optim.Adam(model.optim_list, betas=(0.9, 0.999))
     elif model.optim_type=="sgd":
         model.optimizer = optim.SGD(model.optim_list)
     elif model.optim_type=="sgd_momentum":
-        model.optimizer = optim.SGD(model.params(), 0.1,
+        model.optimizer = optim.SGD(model.optim_list,
                                   momentum=0.9, nesterov=True,
                                   weight_decay=0.0005)
     else:
