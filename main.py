@@ -123,6 +123,11 @@ reweighting_params.add_argument('--vnet_opt', type=str, default='sgd_momentum', 
 reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
 reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
 
+# sample-selection parameters
+sampling_params = parser.add_argument_group('Sample selection Parameters')
+sampling_params.add_argument('--sampling_strategy', type=str, default='none', choices=['vnet', 'none'], help='Sample selection strategy for exemplar replay')
+
+
 # dataloader parameters
 data_params = parser.add_argument_group('Data-related Parameters')
 data_params.add_argument('--imb_factor', type=float, default=1.0, help='imbalance factor')
@@ -324,6 +329,18 @@ def run(args):
     else:
         generator = None
 
+    #-------------------------------------------------------------------------------------------------#
+
+    #--------------------#
+    #----- JT TRAINING -----#
+    #--------------------#
+
+    if args.tasks == 1:
+        args.vnet_enable_from = 1
+        model.herding = args.herding
+
+    if args.sampling_strategy == 'vnet':
+        args.reweighting_strategy = 'vnet'
 
     #-------------------------------------------------------------------------------------------------#
 
@@ -425,16 +442,6 @@ def run(args):
     #-------------------------------------------------------------------------------------------------#
 
     #--------------------#
-    #----- JT TRAINING -----#
-    #--------------------#
-
-    if args.tasks == 1:
-        args.vnet_enable_from = 1
-        model.herding = args.herding
-
-    #-------------------------------------------------------------------------------------------------#
-
-    #--------------------#
     #----- TRAINING -----#
     #--------------------#
 
@@ -451,7 +458,8 @@ def run(args):
         imb_factor = args.imb_factor, imb_inverse = args.imb_inv, reset_vnet= args.reset_vnet,
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
         vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
-        imb_strategy = args.reweighting_strategy, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir
+        imb_strategy = args.reweighting_strategy, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir,
+        sampling_strategy = args.sampling_strategy
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

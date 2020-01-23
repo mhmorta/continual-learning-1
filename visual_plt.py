@@ -59,9 +59,9 @@ def plot_vnet(vnet_dir, weight_dict, name=None):
 
     ax.set(xlabel='loss', ylabel='weights')
     ax.grid()
-    plt.title('Weight score per loss value')
+    plt.title('Weight score per loss value at the {}'.format(name))
 
-    address = "{}/weights.png".format(vnet_dir) if name is None else "{}/{}.png".format(vnet_dir,name)
+    address = "{}/weights_{}.png".format(vnet_dir, name)
     fig.savefig(address)
 
 def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):

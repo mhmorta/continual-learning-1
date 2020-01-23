@@ -19,7 +19,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), imb_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
-             metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = ""):
+             metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -41,6 +41,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     # Use cuda?
     cuda = model._is_on_cuda()
     device = model._device()
+    print('Running on {}'.format(device))
 
 
     # Initiate possible sources for replay (no replay for 1st task)
@@ -63,7 +64,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         weight_dict = {}
         weight_dict[0] = vnet.loss_weights()
 
-        plot_vnet(vnet_dir, weight_dict, name="vnet_start")
+        plot_vnet(vnet_dir, weight_dict, name="start")
 
         if vnet_opt=='sgd_momentum':
             optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
@@ -92,18 +93,6 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
-        # ----------- resetting weight-net? -----------
-        # if use_vnet and reset_vnet:
-        #     vnet = VNet(1, 50, 1).to(device)
-        #     optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
-        #                                   momentum=0.9, nesterov=True,
-        #                                   weight_decay=5e-4)
-
-        # if use_vnet and reset_vnet_optim:
-        #     optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
-        #                                   momentum=0.9, nesterov=True,
-        #                                   weight_decay=5e-4)
-            # optimizer_c = torch.optim.Adam(vnet.params(), betas=(0.9, 0.999))
         # --------------------------------------------
         # creating dataloader for meta-data set
         new_classes = list(range(classes_per_task)) if scenario == "domain" else list(
@@ -169,8 +158,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             Exact = True
             previous_datasets = train_datasets()
 
-        # --------------------
-        # Enforce imbalanced data factor to the train_dataset
+        # ----------------------------------------
+        # ----------------------------------------
+
+        # Creating imabalanced training_dataset
 
         # Creating trainingset data loader for JT case
         if imb_factor < 1.0 and len(train_datasets) == 1:
@@ -195,6 +186,24 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             num_samples = int(np.floor(ratio * len( train_dataset.sub_indeces)))
             train_dataset.sub_indeces = np.random.choice(train_dataset.sub_indeces, num_samples)
             print(len(train_dataset.sub_indeces))
+
+        # ----------------------------------------
+        # ----------------------------------------
+        # for imbalanced JT: Populating ExemplarDataset for iCar
+        if imb_factor < 1.0 and len(train_datasets) == 1 and add_exemplars:
+            exemplars_per_class = 20
+            # for each new class trained on, construct examplar-set
+            for class_id in new_classes:
+                start = time.time()
+                # create new dataset containing only all examples of this class
+                class_dataset = SubDataset(original_dataset=train_dataset, sub_labels=[class_id])
+                # based on this dataset, construct new exemplar-set for this class
+                model.construct_exemplar_set(dataset=class_dataset, n=exemplars_per_class)
+            print("Constructed exemplars for iCard in imbalanced-JT")
+
+
+        # ----------------------------------------
+        # ----------------------------------------
 
         # Add exemplars (if available) to current dataset (if requested)
         if add_exemplars and task>1:
@@ -279,7 +288,6 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                         data_loader_previous = iter(utils.get_data_loader(ConcatDataset(previous_datasets),
                                                                           batch_size_to_use, cuda=cuda, drop_last=True))
                         iters_left_previous = len(data_loader_previous)
-
 
             # -----------------Collect data------------------#
 
@@ -432,6 +440,35 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     l_g_meta.backward()
                     optimizer_c.step()
 
+                    # if sampling_strategy == 'vnet':
+                    #     # rank examples of the budget and add to x
+                    #     exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=None)
+                    #     exemplar_loader = iter(utils.get_data_loader(exemplar_dataset, 50, cuda=cuda, drop_last=False))
+                    #     num_batches = int(len(exemplar_dataset) / 50)
+                    #     for i in range(num_batches):
+                    #         input, target = next(iter(train_meta_loader))
+                    #         input = to_var(input, requires_grad=False)
+                    #         target = to_var(target.type(torch.LongTensor), requires_grad=False)
+                    #
+                    #         y_g_hat = meta_model(input)
+                    #         cost_w = F.cross_entropy(y_g_hat, target_var, reduction='none')
+                    #         cost_v = torch.reshape(cost_w, (len(cost_w), 1))
+                    #
+                    #         with torch.no_grad():
+                    #             w_new = vnet(cost_v)
+                    #         norm_v = torch.sum(w_new)
+                    #
+                    #         if norm_v != 0:
+                    #             w_v = w_new / norm_v
+                    #         else:
+                    #             w_v = w_new
+                    #
+                    #         l_f = torch.sum(cost_v * w_v)
+
+                # -----------------------------------------
+
+
+
 
                 # -----------------------------------------
                 # Train the main model with this batch
@@ -441,6 +478,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                                                 scores=scores, scores_=scores_,
                                                 active_classes=active_classes, task=task, rnt = 1./task, vnet=vnet,
                                                 use_vnet_for_loss=use_vnet_for_loss, loss_weights = CE_weights, vnet_loss_ratio=vnet_loss_ratio)
+                # -----------------------------------------
 
                 if imb_strategy=='vnet':
                     loss_list.append(loss_dict['loss_current'])
@@ -492,7 +530,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
             # if it's the last task
             if task == len(train_datasets):
-                plot_vnet(vnet_dir, vnet_weights_dict)
+                plot_vnet(vnet_dir, vnet_weights_dict, "end")
 
         # plot losses
         if imb_strategy=='vnet' and task == len(train_datasets):
@@ -539,7 +577,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             if task == len(train_datasets):
                 plot_class_weights(vnet_dir, class_weights, task)
         # -------------------------------------------
-        # Close progres-bar(s)
+        # Close progress-bar(s)
         progress.close()
         if generator is not None:
             progress_gen.close()
