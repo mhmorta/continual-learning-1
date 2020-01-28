@@ -19,7 +19,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), imb_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
-             metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None):
+             metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None, vnet_bs = 100):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -87,11 +87,16 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         vnet_loss_list = []
         loss_original_list = []
 
+        meta_sub_indeces_list = []
         torch.backends.cudnn.benchmark = True
+
+
 
     metadata_list = []
     CE_weights = None
-
+    x_meta = None
+    y_meta = None
+    training_subset_sampler = None
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
@@ -101,30 +106,40 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             range(classes_per_task * (task - 1),
                   classes_per_task * task))
 
-        if imb_strategy=='vnet' and task >= vnet_enable_from:
+        if imb_strategy=='vnet':
             if metadataset_building_strategy == 'trainingset':
-                # Adding to the meta_model dataset from the current data
-                for class_id in new_classes:
-                    # create new dataset containing only all examples of this class
-                    current_dataset = SubDataset(original_dataset=train_dataset, sub_labels=[class_id])
-                    # based on this dataset, construct new exemplar-set for this class
-                    model.construct_exemplar_set(dataset=current_dataset, n=vnet_exemplars_per_class, meta_data=True)
 
-                vnet_meta_dataset = ExemplarDataset(model.meta_data, target_transform=None)
+                targets = np.array(train_dataset.sub_indeces).astype(int)
+                tmp = np.array([train_dataset.dataset[i][1] for i in targets])
+                for cls in new_classes:
+                    sub_targets = np.where(tmp == cls)[0]
+                    ind = np.random.choice(sub_targets, vnet_exemplars_per_class)
+                    meta_sub_indeces_list.extend(ind)
 
-                train_meta_loader = iter(cycle(utils.get_data_loader(
-                    vnet_meta_dataset, 256, cuda=cuda, drop_last=False, shuffle=True
-                )))
+                validation_sub_dataset = torch.utils.data.Subset(train_dataset, meta_sub_indeces_list)
+                train_meta_loader = iter(utils.get_data_loader(
+                    validation_sub_dataset, 20, cuda=cuda, drop_last=False, shuffle=True
+                ))
+
+                # meta_training_sampler = torch.utils.data.SubsetRandomSampler(meta_sub_indeces_list)
+                # train_meta_loader = iter(utils.get_data_loader(
+                #     train_dataset, 20, cuda=cuda, drop_last=False, shuffle=False, sampler=meta_training_sampler
+                # ))
+
+                x, y = next(train_meta_loader)
+                x_meta = x if x_meta is None else torch.cat((x_meta, x), dim=0)
+
+                training_subset_sampler = torch.utils.data.SubsetRandomSampler(np.delete(np.arange(len(train_dataset)), meta_sub_indeces_list))
                 print('Meta-dataset generated from training-set')
 
             elif metadataset_building_strategy == 'testset':
                 rand_sampler = torch.utils.data.RandomSampler(meta_datasets[task - 1], num_samples=64, replacement=True)
                 train_meta_loader = iter(cycle(utils.get_data_loader(
-                    meta_datasets[task-1], 64, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
+                    meta_datasets[task-1], vnet_bs, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
                 )))
                 print('Meta-dataset generated from test-set')
 
-            elif metadataset_building_strategy == 'exemplar' and len(model.exemplar_sets)>0:
+            elif metadataset_building_strategy == 'exemplar' and len(model.exemplar_sets)>0 and task >= vnet_enable_from:
                 num_classes = len(model.exemplar_sets)
                 meta_ds_list = []
 
@@ -146,9 +161,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 vnet_meta_dataset = ExemplarDataset(meta_ds_list, target_transform=None)
 
                 train_meta_loader = iter(cycle(utils.get_data_loader(
-                    vnet_meta_dataset, 256, cuda=cuda, drop_last=False, shuffle=True
+                    vnet_meta_dataset, vnet_bs, cuda=cuda, drop_last=False, shuffle=True
                 )))
                 print('Meta-dataset generated from exemplar-set')
+            x_meta, y_meta = next(train_meta_loader)
 
         # ----------------------------------------
 
@@ -174,13 +190,19 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 CE_weights = torch.FloatTensor([((summ - samples_per_class[i])/summ) for i in range(len(samples_per_class))]).to(device)
             print("samples per classes = ", samples_per_class)
             final_dataset = None
+            imb_sub_indeces_list = []
+            targets = np.array(train_dataset.dataset.targets)
             for cls in range(10):
-                tmp = SubDataset(train_dataset,  sub_labels=[cls])
+                sub_targets = np.where(targets == cls)[0]
                 id = 9 - cls if imb_inverse else cls
-                tmp.sub_indeces = np.random.choice(tmp.sub_indeces, samples_per_class[id])
-                final_dataset = tmp if final_dataset is None else ConcatDataset([final_dataset, tmp])
-            print('final_dataset = ', len(final_dataset))
-            train_dataset = final_dataset
+                inds = np.random.choice(sub_targets, samples_per_class[id])
+                imb_sub_indeces_list.extend(inds)
+
+            imb_sub_indeces_list = np.delete(imb_sub_indeces_list, meta_sub_indeces_list)
+            training_subset_sampler = torch.utils.data.SubsetRandomSampler(imb_sub_indeces_list)
+
+            print('imb_sub_indeces_list = ', len(imb_sub_indeces_list))
+            # train_dataset = final_dataset
 
         elif imb_factor < 1.0 and scenario is "class":
             pow = len(train_datasets) - task if imb_inverse else (task -1)
@@ -266,7 +288,13 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             # Update # iters left on current data-loader(s) and, if needed, create new one(s)
             iters_left -= 1
             if iters_left==0:
-                data_loader = iter(utils.get_data_loader(training_dataset, batch_size, cuda=cuda, drop_last=True))
+                if training_subset_sampler is None:
+                    data_loader = iter(utils.get_data_loader(training_dataset, batch_size, cuda=cuda, drop_last=True))
+                else:
+                    data_loader = iter(utils.get_data_loader(
+                        training_dataset, batch_size, cuda=cuda, drop_last=True, sampler=training_subset_sampler, shuffle=False
+                    ))
+
                 # NOTE:  [train_dataset]  is training-set of current task
                 #      [training_dataset] is training-set of current task with stored exemplars added (if requested)
                 iters_left = len(data_loader)

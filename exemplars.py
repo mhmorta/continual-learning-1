@@ -55,6 +55,8 @@ class ExemplarHandler(nn.Module, metaclass=abc.ABCMeta):
         n_max = len(dataset)
         exemplar_set = []
 
+        indeces_selected = None
+
         if self.herding:
             # compute features for each example in [dataset]
             first_entry = True
@@ -112,6 +114,8 @@ class ExemplarHandler(nn.Module, metaclass=abc.ABCMeta):
 
         # set mode of model back
         self.train(mode=mode)
+
+        return indeces_selected
 
 
     ####----CLASSIFICATION----####

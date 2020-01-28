@@ -116,7 +116,7 @@ reweighting_params.add_argument('--vnet_loss_ratio', type=float, default=0.5, he
 reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
 building_strategies_choices = ['testset', 'trainingset', 'exemplar', 'none']
 reweighting_params.add_argument('--metadataset_building_strategy', type=str, default='testset', choices=building_strategies_choices)
-reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=50, help="Number of examples per class")
+reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=10, help="Number of examples per class")
 vnet_optimizer_choices = ['sgd', 'sgd_momentum', 'adam']
 reweighting_params.add_argument('--vnet_opt', type=str, default='sgd_momentum', choices=vnet_optimizer_choices)
 
