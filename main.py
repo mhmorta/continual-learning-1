@@ -122,6 +122,7 @@ reweighting_params.add_argument('--vnet_opt', type=str, default='sgd_momentum', 
 
 reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
 reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
+reweighting_params.add_argument('--vnet_plot_freq', type=int, default=500, help="Frequency of plotting vnet weightes")
 
 # sample-selection parameters
 sampling_params = parser.add_argument_group('Sample selection Parameters')
@@ -459,7 +460,7 @@ def run(args):
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
         vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
         imb_strategy = args.reweighting_strategy, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir,
-        sampling_strategy = args.sampling_strategy
+        sampling_strategy = args.sampling_strategy, vnet_plot_freq = args.vnet_plot_freq
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

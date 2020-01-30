@@ -19,7 +19,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), imb_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
-             metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None):
+             metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None,
+             vnet_plot_freq = 500):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -200,7 +201,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 summ = sum(samples_per_class)
                 CE_weights = torch.FloatTensor([((summ - samples_per_class[i])/summ) for i in range(len(samples_per_class))]).to(device)
             print("samples per classes = ", samples_per_class)
-            final_dataset = None
+
             imb_sub_indeces_list = []
             targets = np.array(train_dataset.dataset.targets)
             for cls in range(10):
@@ -213,7 +214,6 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             training_subset_sampler = torch.utils.data.SubsetRandomSampler(imb_sub_indeces_list)
 
             print('imb_sub_indeces_list = ', len(imb_sub_indeces_list))
-            # train_dataset = final_dataset
 
         elif imb_factor < 1.0 and scenario is "class":
             pow = len(train_datasets) - task if imb_inverse else (task -1)
@@ -235,7 +235,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 # based on this dataset, construct new exemplar-set for this class
                 model.construct_exemplar_set(dataset=class_dataset, n=exemplars_per_class)
             print("Constructed exemplars for iCard in imbalanced-JT")
-
+            print("Should be checked")
+            raise
 
         # ----------------------------------------
         # ----------------------------------------
@@ -581,11 +582,11 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
         # plot class weights
         if imb_strategy=='vnet':
-            curentdata_data_loader = iter(cycle(utils.get_data_loader(
-                train_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
-            )))
+            # curentdata_data_loader = iter(cycle(utils.get_data_loader(
+            #     train_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
+            # )))
 
-            x, y = next(iter(curentdata_data_loader))
+            x, y = x_meta, y_meta
             x = to_var(x, requires_grad=False)
             y = to_var(y.type(torch.LongTensor), requires_grad=False)
 
