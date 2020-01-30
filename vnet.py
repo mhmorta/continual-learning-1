@@ -302,6 +302,8 @@ class VNet(MetaModule):
         self.linear2 = MetaLinear(hidden1, output)
         # self.linear3 = MetaLinear(hidden2, output)
 
+        self.apply(_weights_init)
+
     def forward(self, x):
         x = self.linear1(x)
         x = self.relu1(x)

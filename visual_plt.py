@@ -24,8 +24,10 @@ def plot_losses(vnet_dir, model_loss, model_vnet_loss, loss_original):
         plt.title('Loss plot')
         fig.savefig("{}/losses.png".format(vnet_dir))
 
-def plot_class_weights(vnet_dir, weight_dict, task):
+def plot_class_vs_loss(vnet_dir, value_dict, task, title, file_name, normalized=None):
     fig, ax = plt.subplots()
+
+    ax.grid()
 
     max_len = 0
     # For the JT case
@@ -33,22 +35,29 @@ def plot_class_weights(vnet_dir, weight_dict, task):
         x = np.arange(1, 10.01)
         y = []
         for i in range(10):
-            y.append(weight_dict[i])
+            y.append(value_dict[i])
         ax.plot(x, y, '.-')
 
+        # if normalized is not None:
+        #     y2 = []
+        #     for i in range(10):
+        #         y2.append(normalized[i])
+        #     ax.plot(x, y2, label='Normalized')
+
+
     else:
-        for cls, weights in weight_dict.items():
+        for cls, weights in value_dict.items():
             max_len = len(weights) if len(weights) > max_len else max_len
             x = np.arange(max_len - len(weights) + 1, max_len +1)
             ax.plot( x, weights, '.-', label='Class {:d}'.format(cls))
 
     plt.legend(loc='best')
 
-    ax.set(xlabel='Task', ylabel='Class weights')
-    plt.title('Class weights by vnet')
-    fig.savefig("{}/class_weights.png".format(vnet_dir))
+    ax.set(xlabel='Class', ylabel=file_name)
+    plt.title(title)
+    fig.savefig("{}/class_vs_{}.png".format(vnet_dir, file_name))
 
-def plot_vnet(vnet_dir, weight_dict, name=None):
+def plot_loss_vs_weight(vnet_dir, weight_dict, name=None):
     x = np.arange(0.00, 10.00, 0.1)
 
     fig, ax = plt.subplots()

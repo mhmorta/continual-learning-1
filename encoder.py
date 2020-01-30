@@ -48,7 +48,6 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
             self.classifier = fc_layer(mlp_output_size, classes, excit_buffer=True, nl='none', drop=fc_drop)
             print('resnet classifier... ')
 
-
         elif model_type =='resnet32':
             self.classifier = ResNet32(num_classes=classes, in_channels=image_channels)
             print('resnet classifier... ')

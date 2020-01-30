@@ -12,7 +12,7 @@ import os
 from data import SubDataset, ExemplarDataset
 from continual_learner import ContinualLearner
 from vnet import *
-from visual_plt import plot_vnet, plot_class_weights, plot_losses
+from visual_plt import plot_loss_vs_weight, plot_class_vs_loss, plot_losses
 
 
 def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
@@ -65,7 +65,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         weight_dict = {}
         weight_dict[0] = vnet.loss_weights()
 
-        plot_vnet(vnet_dir, weight_dict, name="start")
+        plot_loss_vs_weight(vnet_dir, weight_dict, name="start")
 
         if vnet_opt=='sgd_momentum':
             optimizer_c = torch.optim.SGD(vnet.params(), 1e-5,
@@ -81,8 +81,12 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
         vnet_weights_dict = {}
         class_weights = {}
-        for i in range(11):
+        class_loss = {}
+        class_weighted_loss = {}
+        for i in range(10):
             class_weights[i] = []
+            class_loss[i] = []
+            class_weighted_loss[i] = []
 
         loss_list = []
         vnet_loss_list = []
@@ -197,17 +201,19 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         if imb_factor < 1.0 and len(train_datasets) == 1:
             classes_sub_datasets = []
             samples_per_class = [int(np.floor(5000*((imb_factor)**(i / (10 - 1.0))))) for i in range(10) ]
+            samples_per_class = [samples_per_class[i] for i in range(9,-1,-1)  ] if imb_inverse else samples_per_class
             if imb_strategy=="weighted_ce":
                 summ = sum(samples_per_class)
-                CE_weights = torch.FloatTensor([((summ - samples_per_class[i])/summ) for i in range(len(samples_per_class))]).to(device)
+                CE_weights = torch.FloatTensor([ (1.0 / class_count) for class_count in samples_per_class]).to(device)
+                print("CE class weights: ", CE_weights.data)
+
             print("samples per classes = ", samples_per_class)
 
             imb_sub_indeces_list = []
             targets = np.array(train_dataset.dataset.targets)
             for cls in range(10):
                 sub_targets = np.where(targets == cls)[0]
-                id = 9 - cls if imb_inverse else cls
-                inds = np.random.choice(sub_targets, samples_per_class[id])
+                inds = np.random.choice(sub_targets, samples_per_class[cls])
                 imb_sub_indeces_list.extend(inds)
 
             # imb_sub_indeces_list = np.delete(imb_sub_indeces_list, meta_sub_indeces_list)
@@ -573,11 +579,9 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
             # if it's the last task
             if task == len(train_datasets):
-                plot_vnet(vnet_dir, vnet_weights_dict, "end")
+                plot_loss_vs_weight(vnet_dir, vnet_weights_dict, "end")
 
-        # plot losses
-        if imb_strategy=='vnet' and task == len(train_datasets):
-            plot_losses(vnet_dir, loss_list, vnet_loss_list, loss_original_list)
+
 
 
         # plot class weights
@@ -593,32 +597,55 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             y_f_hat = model(x)
             cost = F.cross_entropy(y_f_hat, y, reduce=False)
 
+            cost_v = torch.reshape(cost.clone(), (len(cost), 1))
+
+            v_lambda = vnet(cost_v.data)
+
+            norm_c = torch.sum(v_lambda)
+
+            if norm_c != 0:
+                v_lambda_norm = v_lambda / norm_c
+            else:
+                v_lambda_norm = v_lambda
+
+            l_f_meta = cost_v * v_lambda_norm
+
             for cls in new_classes:
-                cls_cost_list = cost[y==cls]
-                cls_cost = cls_cost_list.mean()
-                class_weights[cls].append(cls_cost)
+                class_loss[cls].append(cost[y==cls].mean())
+                class_weights[cls].append(v_lambda[y==cls].mean())
+                class_weighted_loss[cls].append(v_lambda_norm[y==cls].mean())
+
 
             if len(model.exemplar_sets) > 0:
-                exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=None)
-
-                curentdata_data_loader = iter(cycle(utils.get_data_loader(
-                    exemplar_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
-                )))
-
-                x, y = next(iter(curentdata_data_loader))
-                x = to_var(x, requires_grad=False)
-                y = to_var(y.type(torch.LongTensor), requires_grad=False)
-
-                y_f_hat = model(x)
-                cost = F.cross_entropy(y_f_hat, y, reduce=False)
-
-                for cls in range(len(model.exemplar_sets)):
-                    cls_cost_list = cost[y == cls]
-                    cls_cost = cls_cost_list.mean()
-                    class_weights[cls].append(cls_cost)
+                # exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=None)
+                #
+                # curentdata_data_loader = iter(cycle(utils.get_data_loader(
+                #     exemplar_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
+                # )))
+                #
+                # x, y = next(iter(curentdata_data_loader))
+                # x = to_var(x, requires_grad=False)
+                # y = to_var(y.type(torch.LongTensor), requires_grad=False)
+                #
+                # y_f_hat = model(x)
+                # cost = F.cross_entropy(y_f_hat, y, reduce=False)
+                #
+                # for cls in range(len(model.exemplar_sets)):
+                #     cls_cost_list = cost[y == cls]
+                #     cls_cost = cls_cost_list.mean()
+                #     class_weights[cls].append(cls_cost)
+                print("needs to be updated")
+                raise
 
             if task == len(train_datasets):
-                plot_class_weights(vnet_dir, class_weights, task)
+                plot_class_vs_loss(vnet_dir, class_loss, task, title='CE loss of classes', file_name='loss')
+                plot_class_vs_loss(vnet_dir, class_weights, task,title='Weight of classes', file_name='weight')
+                plot_class_vs_loss(vnet_dir, class_weighted_loss, task, title='Normalized weighted of classes', file_name='normalized weights')
+
+        # plot losses
+        if imb_strategy=='vnet' and task == len(train_datasets):
+            plot_losses(vnet_dir, loss_list, vnet_loss_list, loss_original_list)
+
         # -------------------------------------------
         # Close progress-bar(s)
         progress.close()
