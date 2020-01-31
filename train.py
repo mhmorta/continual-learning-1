@@ -20,7 +20,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), imb_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
              metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None,
-             vnet_plot_freq = 500):
+             vnet_plot_count = 4):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -62,13 +62,13 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     if imb_strategy=='vnet':
         vnet = VNet(1, 100, 1).to(device)
 
-        weight_dict = {}
-        weight_dict[0] = vnet.loss_weights()
+        vnet_plot_freq = int(iters / (vnet_plot_count-1))
 
-        plot_loss_vs_weight(vnet_dir, weight_dict, name="start")
+        vnet_weights_dict = {}
+        vnet_weights_dict[0] = vnet.loss_weights()
 
         if vnet_opt=='sgd_momentum':
-            optimizer_c = torch.optim.SGD(vnet.params(), 1e-5,
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
                                           momentum=0.9, nesterov=True,
                                           weight_decay=5e-4)
         elif vnet_opt=='sgd':
@@ -79,7 +79,6 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             optimizer_c = None
 
 
-        vnet_weights_dict = {}
         class_weights = {}
         class_loss = {}
         class_weighted_loss = {}
@@ -193,9 +192,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             previous_datasets = train_datasets()
 
         # ----------------------------------------
-        # ----------------------------------------
-
         # Creating imabalanced training_dataset
+        # ----------------------------------------
 
         # Creating trainingset data loader for JT case
         if imb_factor < 1.0 and len(train_datasets) == 1:
@@ -446,8 +444,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     meta_model.train()
                     vnet.train()
                     # ----- Update meta-model -----
-                    input_var = to_var(x, requires_grad=False)
-                    target_var = to_var(y, requires_grad=False)
+                    input_var = to_var(x_meta, requires_grad=False)
+                    target_var = to_var(y_meta, requires_grad=False)
 
                     # meta_model = build_model()
 
@@ -554,6 +552,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     for sample_cb in sample_cbs:
                         if sample_cb is not None:
                             sample_cb(model, batch_index, task=task)
+                if ((batch_index) % vnet_plot_freq == 0) and imb_strategy=='vnet' and batch_index >1:
+                    vnet_weights_dict[batch_index] = vnet.loss_weights()
+
+                # End of if batch_index <= iters:
 
 
             #---> Train GENERATOR
@@ -574,15 +576,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
         ##----------> UPON FINISHING EACH TASK...
         # How is vnet trained?
-        if imb_strategy=='vnet' and task >= vnet_enable_from:
-            vnet_weights_dict[task]= vnet.loss_weights()
-
-            # if it's the last task
-            if task == len(train_datasets):
-                plot_loss_vs_weight(vnet_dir, vnet_weights_dict, "end")
-
-
-
+        if use_vnet_for_loss:
+            plot_loss_vs_weight(vnet_dir, vnet_weights_dict, task)
 
         # plot class weights
         if imb_strategy=='vnet':
@@ -614,28 +609,6 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 class_loss[cls].append(cost[y==cls].mean())
                 class_weights[cls].append(v_lambda[y==cls].mean())
                 class_weighted_loss[cls].append(v_lambda_norm[y==cls].mean())
-
-
-            if len(model.exemplar_sets) > 0:
-                # exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=None)
-                #
-                # curentdata_data_loader = iter(cycle(utils.get_data_loader(
-                #     exemplar_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
-                # )))
-                #
-                # x, y = next(iter(curentdata_data_loader))
-                # x = to_var(x, requires_grad=False)
-                # y = to_var(y.type(torch.LongTensor), requires_grad=False)
-                #
-                # y_f_hat = model(x)
-                # cost = F.cross_entropy(y_f_hat, y, reduce=False)
-                #
-                # for cls in range(len(model.exemplar_sets)):
-                #     cls_cost_list = cost[y == cls]
-                #     cls_cost = cls_cost_list.mean()
-                #     class_weights[cls].append(cls_cost)
-                print("needs to be updated")
-                raise
 
             if task == len(train_datasets):
                 plot_class_vs_loss(vnet_dir, class_loss, task, title='CE loss of classes', file_name='loss')

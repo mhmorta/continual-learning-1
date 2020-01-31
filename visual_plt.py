@@ -57,20 +57,20 @@ def plot_class_vs_loss(vnet_dir, value_dict, task, title, file_name, normalized=
     plt.title(title)
     fig.savefig("{}/class_vs_{}.png".format(vnet_dir, file_name))
 
-def plot_loss_vs_weight(vnet_dir, weight_dict, name=None):
+def plot_loss_vs_weight(vnet_dir, weight_dict, task=None):
     x = np.arange(0.00, 10.00, 0.1)
 
     fig, ax = plt.subplots()
     for id, weight in weight_dict.items():
-        ax.plot(x, weight, label='Task {:d}'.format(id))
+        ax.plot(x, weight, label='Iteration {:d}'.format(id))
 
     plt.legend(loc='best')
 
     ax.set(xlabel='loss', ylabel='weights')
     ax.grid()
-    plt.title('Weight score per loss value at the {}'.format(name))
+    plt.title('Weight score per loss value fort task  {}'.format(task))
 
-    address = "{}/weights_{}.png".format(vnet_dir, name)
+    address = "{}/weights_task{}.png".format(vnet_dir, task)
     fig.savefig(address)
 
 def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):
