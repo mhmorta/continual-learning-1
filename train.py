@@ -106,6 +106,12 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
+        if reset_vnet == True:
+            vnet = VNet(1, 200, 1).to(device)
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+                                          momentum=0.9, nesterov=True,
+                                          weight_decay=5e-4)
+
         # --------------------------------------------
         # creating dataloader for meta-data set
         new_classes = list(range(classes_per_task)) if scenario == "domain" else list(
@@ -234,7 +240,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
         elif imb_factor < 1.0 and scenario is "class":
             pow = len(train_datasets) - task if imb_inverse else (task -1)
-            ratio = (imb_factor**(pow / (len(train_datasets) - 1.0)))
+            ratio = (imb_factor**((pow*len(new_classes)) / (len(train_datasets) - 1.0)))
             num_samples = int(np.floor(ratio * len( train_dataset.sub_indeces)))
             train_dataset.sub_indeces = np.random.choice(train_dataset.sub_indeces, num_samples)
             print(len(train_dataset.sub_indeces))
@@ -539,8 +545,11 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     meta_model.train()
                     vnet.train()
                     # ----- Update meta-model -----
-                    input_var = to_var(x_meta, requires_grad=False)
-                    target_var = to_var(y_meta, requires_grad=False)
+                    # input_var = to_var(x_meta, requires_grad=False)
+                    # target_var = to_var(y_meta, requires_grad=False)
+
+                    input_var = to_var(x, requires_grad=False)
+                    target_var = to_var(y, requires_grad=False)
 
                     # meta_model = build_model()
 
