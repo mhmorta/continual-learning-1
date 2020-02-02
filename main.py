@@ -110,8 +110,8 @@ eval_params.add_argument('--sample-n', type=int, default=64, help="# images to s
 
 # reweighting parameters
 reweighting_params = parser.add_argument_group('Reweighting Parameters')
-reweighting_strategies_choices = ['vnet', 'weighted_ce', 'none']
-reweighting_params.add_argument('--reweighting_strategy', type=str, default='none', choices=reweighting_strategies_choices, help='Reweighting strategy from none, weighted_CE, or vnet')
+reweighting_strategies_choices = [ 'meta_update', 'vnet', 'weighted_ce', 'none']
+reweighting_params.add_argument('--rs', type=str, default='none', choices=reweighting_strategies_choices, help='Reweighting strategy from none, weighted_CE, or vnet')
 reweighting_params.add_argument('--vnet_loss_ratio', type=float, default=0.5, help="Ratio of vnet in the loss")
 reweighting_params.add_argument('--vnet_enable_from', type=int, default=2, help="Running vnet from which task number?")
 building_strategies_choices = ['testset', 'trainingset', 'exemplar', 'none']
@@ -119,14 +119,15 @@ reweighting_params.add_argument('--metadataset_building_strategy', type=str, def
 reweighting_params.add_argument('--vnet_exemplars_per_class', type=int, default=10, help="Number of examples per class")
 vnet_optimizer_choices = ['sgd', 'sgd_momentum', 'adam']
 reweighting_params.add_argument('--vnet_opt', type=str, default='sgd_momentum', choices=vnet_optimizer_choices)
-
 reweighting_params.add_argument('--reset_vnet_optim', type=bool, default=False, help="reset optimizer of the vnet for each task?")
 reweighting_params.add_argument('--reset_vnet', type=bool, default=False, help="rese vnet for each task?")
 reweighting_params.add_argument('--vnet_plot_count', type=int, default=4, help="Frequency of plotting vnet weightes")
 
 # sample-selection parameters
 sampling_params = parser.add_argument_group('Sample selection Parameters')
-sampling_params.add_argument('--sampling_strategy', type=str, default='none', choices=['vnet', 'none'], help='Sample selection strategy for exemplar replay')
+# hem represents hard-example mining
+sampling_params.add_argument('--ss', type=str, default='none', choices=['hard_sampling', 'vnet', 'random'], help='Sample selection strategy for exemplar replay')
+sampling_params.add_argument('--hs_samples', type=int, default=40, help="Number of hard samples to replay")
 
 
 # dataloader parameters
@@ -340,8 +341,8 @@ def run(args):
         args.vnet_enable_from = 1
         model.herding = args.herding
 
-    if args.sampling_strategy == 'vnet':
-        args.reweighting_strategy = 'vnet'
+    # if args.ss == 'vnet':
+    #     args.rs = 'vnet'
 
     #-------------------------------------------------------------------------------------------------#
 
@@ -359,7 +360,7 @@ def run(args):
         os.mkdir("{}/{}".format(args.r_dir, param_stamp))
 
     vnet_dir = ''
-    if args.reweighting_strategy=='vnet':
+    if args.rs=='vnet':
         vnet_dir = "{}/{}/vnet".format(args.r_dir, param_stamp)
         if not os.path.isdir(vnet_dir):
             os.mkdir(vnet_dir)
@@ -459,8 +460,8 @@ def run(args):
         imb_factor = args.imb_factor, imb_inverse = args.imb_inv, reset_vnet= args.reset_vnet,
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
         vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
-        imb_strategy = args.reweighting_strategy, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir,
-        sampling_strategy = args.sampling_strategy, vnet_plot_count = args.vnet_plot_count
+        reweighting_strategy = args.rs, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir,
+        sampling_strategy = args.ss, vnet_plot_count = args.vnet_plot_count, hs_samples = args.hs_samples
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start

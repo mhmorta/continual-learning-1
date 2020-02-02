@@ -132,8 +132,8 @@ def get_param_stamp(args, model_name, verbose=True, replay=False, replay_model_n
 
     # -for reweighting strategies
     reweighting_stamp = ""
-    if args.reweighting_strategy != 'none':
-        strategy_stamp = "{}".format(args.reweighting_strategy)
+    if args.rs != 'none':
+        strategy_stamp = "{}".format(args.rs)
         vnet_stamp = ""
         if strategy_stamp=='vnet':
             vnet_stamp = "{}{}{}{}{}".format('_l' + str(args.vnet_loss_ratio),

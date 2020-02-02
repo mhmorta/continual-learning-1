@@ -17,10 +17,10 @@ from visual_plt import plot_loss_vs_weight, plot_class_vs_loss, plot_losses
 
 def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario="class",classes_per_task=None,iters=2000,batch_size=32,
              generator=None, gen_iters=0, gen_loss_cbs=list(), loss_cbs=list(), eval_cbs=list(), sample_cbs=list(),
-             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), imb_strategy = 'none', imb_factor = 1.0,
+             use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), reweighting_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
              metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None,
-             vnet_plot_count = 4):
+             vnet_plot_count = 4, hs_samples = 40):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -59,8 +59,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     vnet = None
 
     # Initializations of the vnet
-    if imb_strategy=='vnet':
-        vnet = VNet(1, 100, 1).to(device)
+    if reweighting_strategy=='vnet':
+        vnet = VNet(1, 200, 1).to(device)
 
         vnet_plot_freq = int(iters / (vnet_plot_count-1))
 
@@ -100,7 +100,9 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     CE_weights = None
     x_meta = None
     y_meta = None
-    training_subset_sampler = None
+    x_top = None
+    y_top = None
+    training_dataset_sampler = None
 
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
@@ -110,7 +112,18 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             range(classes_per_task * (task - 1),
                   classes_per_task * task))
 
-        if imb_strategy=='vnet':
+        # ---------------- build meta-training set ----------------
+        classes = int(task * 10 / len(train_datasets))
+        meta_dataset = ConcatDataset(meta_datasets[:task])
+        rand_sampler = torch.utils.data.RandomSampler(meta_dataset, replacement=False)
+        train_meta_loader = iter(utils.get_data_loader(
+            meta_dataset, batch_size=vnet_exemplars_per_class * classes, cuda=cuda, drop_last=True,
+            sampler=rand_sampler, shuffle=False
+        ))
+        x_meta, y_meta = next(train_meta_loader)
+        # ---------------- end of meta-training --------------------
+
+        if reweighting_strategy=='vnet' or reweighting_strategy=='meta_update' or reweighting_strategy=='hard_sampling':
             if metadataset_building_strategy == 'trainingset':
                 # targets = np.array(train_dataset.sub_indeces).astype(int)
                 # tmp = np.array([(i, train_dataset.dataset[i][1]) for i in targets])
@@ -132,25 +145,25 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 # x, y = next(train_meta_loader)
                 # x_meta = x if x_meta is None else torch.cat((x_meta, x), dim=0)
                 #
-                # training_subset_sampler = torch.utils.data.SubsetRandomSampler(np.delete(targets, meta_sub_indeces_list))
+                # training_dataset_sampler = torch.utils.data.SubsetRandomSampler(np.delete(targets, meta_sub_indeces_list))
                 # print('Meta-dataset generated from training-set')
                 print('implementation should be updated')
                 raise
 
-            elif metadataset_building_strategy == 'testset':
-
-                classes = int(task * 10 / len(train_datasets))
-
-                meta_dataset = ConcatDataset(meta_datasets[:task])
-
-                rand_sampler = torch.utils.data.RandomSampler(meta_dataset, replacement=False)
-
-                train_meta_loader = iter(utils.get_data_loader(
-                    meta_dataset, batch_size = vnet_exemplars_per_class * classes, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
-                ))
-
-                x_meta, y_meta = next(train_meta_loader)
-                print('Meta-dataset generated from test-set')
+            # elif metadataset_building_strategy == 'testset':
+                # classes = int(task * 10 / len(train_datasets))
+                #
+                # meta_dataset = ConcatDataset(meta_datasets[:task])
+                #
+                # rand_sampler = torch.utils.data.RandomSampler(meta_dataset, replacement=False)
+                #
+                # train_meta_loader = iter(utils.get_data_loader(
+                #     meta_dataset, batch_size = vnet_exemplars_per_class * classes, cuda=cuda, drop_last=True, sampler=rand_sampler, shuffle=False
+                # ))
+                #
+                # x_meta, y_meta = next(train_meta_loader)
+                # print('implementation should be updated')
+                # raise
 
             elif metadataset_building_strategy == 'exemplar' and len(model.exemplar_sets)>0 and task >= vnet_enable_from:
                 # num_classes = len(model.exemplar_sets)
@@ -200,7 +213,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             classes_sub_datasets = []
             samples_per_class = [int(np.floor(5000*((imb_factor)**(i / (10 - 1.0))))) for i in range(10) ]
             samples_per_class = [samples_per_class[i] for i in range(9,-1,-1)  ] if imb_inverse else samples_per_class
-            if imb_strategy=="weighted_ce":
+            if reweighting_strategy=="weighted_ce":
                 summ = sum(samples_per_class)
                 CE_weights = torch.FloatTensor([ (1.0 / class_count) for class_count in samples_per_class]).to(device)
                 print("CE class weights: ", CE_weights.data)
@@ -215,7 +228,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 imb_sub_indeces_list.extend(inds)
 
             # imb_sub_indeces_list = np.delete(imb_sub_indeces_list, meta_sub_indeces_list)
-            training_subset_sampler = torch.utils.data.SubsetRandomSampler(imb_sub_indeces_list)
+            training_dataset_sampler = torch.utils.data.SubsetRandomSampler(imb_sub_indeces_list)
 
             print('imb_sub_indeces_list = ', len(imb_sub_indeces_list))
 
@@ -256,7 +269,14 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 target_transform = (lambda y, x=classes_per_task: y%x) if scenario=="domain" else None
             # ---------------------------------------------------------------------------------------------------- #
             exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=target_transform)
-            training_dataset = ConcatDataset([train_dataset, exemplar_dataset])
+            exemplar_loader = iter(cycle(utils.get_data_loader(exemplar_dataset, 200, cuda=cuda, drop_last=False)))
+
+            if sampling_strategy != 'hard_sampling':
+                training_dataset = ConcatDataset([train_dataset, exemplar_dataset])
+            else:
+                training_dataset = train_dataset
+                ss_data_loader = iter(cycle(utils.get_data_loader(training_dataset, batch_size, cuda=cuda, drop_last=True)))
+
         else:
             training_dataset = train_dataset
 
@@ -300,16 +320,46 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         # Loop over all iterations
         iters_to_use = iters if (generator is None) else max(iters, gen_iters)
         for batch_index in range(1, iters_to_use+1):
-            use_vnet_for_loss = imb_strategy == 'vnet' and task >= vnet_enable_from
+            use_vnet_for_loss = (reweighting_strategy == 'vnet') and task >= vnet_enable_from
+            # ----------------------------------------------
+            if reweighting_strategy == 'meta_update':
+                meta_model = copy.deepcopy(model)
+                meta_model.train()
+                # ----- Update meta-model -----
 
+                input_var = to_var(x_meta, requires_grad=False)
+                target_var = to_var(y_meta, requires_grad=False)
+
+                meta_model.load_state_dict(model.state_dict())
+
+                y_f_hat = meta_model(input_var)
+                l = F.cross_entropy(y_f_hat, target_var)
+
+                meta_model.optim_list = [{'params': filter(lambda p: p.requires_grad, model.params()), 'lr': 0.001}]
+                optimizer = optim.Adam(meta_model.optim_list, betas=(0.9, 0.999))
+
+                optimizer.zero_grad()
+                l.backward()
+                optimizer.step()
+
+                y_f_updated = meta_model(input_var)
+                cost = F.cross_entropy(y_f_updated, target_var, reduce=False)
+
+                tmp = []
+                for cls in range(len(np.unique(y_meta))):
+                    tmp.append(cost[target_var == cls].mean())
+
+                CE_weights = torch.FloatTensor(tmp).to(device)
+
+            # ---------------------------------------------
             # Update # iters left on current data-loader(s) and, if needed, create new one(s)
             iters_left -= 1
             if iters_left==0:
-                if training_subset_sampler is None:
+                if training_dataset_sampler is None:
                     data_loader = iter(utils.get_data_loader(training_dataset, batch_size, cuda=cuda, drop_last=True))
                 else:
                     data_loader = iter(utils.get_data_loader(
-                        training_dataset, batch_size, cuda=cuda, drop_last=True, sampler=training_subset_sampler, shuffle=False
+                        training_dataset, batch_size, cuda=cuda, drop_last=True, sampler=training_dataset_sampler, shuffle=False
                     ))
 
                 # NOTE:  [train_dataset]  is training-set of current task
@@ -337,6 +387,45 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                         iters_left_previous = len(data_loader_previous)
 
             # -----------------Collect data------------------#
+            if sampling_strategy=='hard_sampling' and task > 1:
+                meta_model = copy.deepcopy(model)
+                meta_model.train()
+                # ----- Update meta-model -----
+                input_var, target_var = next(ss_data_loader)
+                input_var = to_var(input_var, requires_grad=False)
+                target_var = to_var(target_var, requires_grad=False)
+
+                # input_var = to_var(x_meta, requires_grad=False)
+                # target_var = to_var(y_meta, requires_grad=False)
+
+                meta_model.load_state_dict(model.state_dict())
+
+                y_f_hat = meta_model(input_var)
+                l = F.cross_entropy(y_f_hat, target_var)
+
+                meta_model.optim_list = [{'params': filter(lambda p: p.requires_grad, meta_model.params()), 'lr': 0.001}]
+                optimizer = optim.Adam(meta_model.optim_list, betas=(0.9, 0.999))
+
+                optimizer.zero_grad()
+                l.backward()
+                optimizer.step()
+
+                # exemplar_dataset = ExemplarDataset(model.exemplar_sets, target_transform=None)
+                # exemplar_loader = iter(utils.get_data_loader(exemplar_dataset, 200, cuda=cuda, drop_last=False))
+                # for batch in range(20):
+                x_exemplars, y_exemplars = next(exemplar_loader)
+                x_exemplars = to_var(x_exemplars, requires_grad=False)
+                y_exemplars = to_var(y_exemplars, requires_grad=False)
+
+                y_pred = meta_model(x_exemplars)
+                cost = F.cross_entropy(y_pred, y_exemplars, reduce=False)
+
+                x_top = x_exemplars[torch.topk(cost, hs_samples)[1]]
+                y_top = y_exemplars[torch.topk(cost, hs_samples)[1]]
+                # print(y_top)
+
+
+                # print(y_top)
 
             #####-----CURRENT BATCH-----#####
             if replay_mode=="offline" and scenario=="task":
@@ -345,6 +434,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 x, y = next(data_loader)                                    #--> sample training data of current task
                 y = y-classes_per_task*(task-1) if scenario=="task" else y  #--> ITL: adjust y-targets to 'active range'
                 x, y = x.to(device), y.to(device)                           #--> transfer them to correct device
+
+                if sampling_strategy=='hard_sampling' and x_top is not None:
+                    x = torch.cat((x, x_top), 0)
+                    y = torch.cat((y, y_top), 0)
                 # If --bce, --bce-distill & scenario=="class", calculate scores of current batch with previous model
                 binary_distillation = hasattr(model, "binaryCE") and model.binaryCE and model.binaryCE_distill
                 if binary_distillation and scenario=="class" and (previous_model is not None):
@@ -436,6 +529,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 scores_ = scores_ if (model.replay_targets == "soft") else None
 
 
+
+
             #---> Train MAIN MODEL
             if batch_index <= iters:
                 # -----------------------------------------
@@ -511,13 +606,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     #             w_v = w_new
                     #
                     #         l_f = torch.sum(cost_v * w_v)
-
                 # -----------------------------------------
 
 
-
-
-                # -----------------------------------------
+                # ----- ------------------------------------
                 # Train the main model with this batch
 
 
@@ -527,7 +619,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                                                 use_vnet_for_loss=use_vnet_for_loss, loss_weights = CE_weights, vnet_loss_ratio=vnet_loss_ratio)
                 # -----------------------------------------
 
-                if imb_strategy=='vnet':
+                if reweighting_strategy=='vnet':
                     loss_list.append(loss_dict['loss_current'])
                     vnet_loss_list.append(loss_dict['loss_vnet'])
                     loss_original_list.append((loss_dict['loss_original']))
@@ -552,10 +644,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     for sample_cb in sample_cbs:
                         if sample_cb is not None:
                             sample_cb(model, batch_index, task=task)
-                if ((batch_index) % vnet_plot_freq == 0) and imb_strategy=='vnet' and batch_index >1:
+                if use_vnet_for_loss and ((batch_index) % vnet_plot_freq == 0) and batch_index >1:
                     vnet_weights_dict[batch_index] = vnet.loss_weights()
 
-                # End of if batch_index <= iters:
+            # End of if batch_index <= iters:
 
 
             #---> Train GENERATOR
@@ -580,7 +672,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             plot_loss_vs_weight(vnet_dir, vnet_weights_dict, task)
 
         # plot class weights
-        if imb_strategy=='vnet':
+        if reweighting_strategy=='vnet':
             # curentdata_data_loader = iter(cycle(utils.get_data_loader(
             #     train_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
             # )))
@@ -616,7 +708,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 plot_class_vs_loss(vnet_dir, class_weighted_loss, task, title='Normalized weighted of classes', file_name='normalized weights')
 
         # plot losses
-        if imb_strategy=='vnet' and task == len(train_datasets):
+        if reweighting_strategy=='vnet' and task == len(train_datasets):
             plot_losses(vnet_dir, loss_list, vnet_loss_list, loss_original_list)
 
         # -------------------------------------------

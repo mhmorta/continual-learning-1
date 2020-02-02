@@ -340,26 +340,6 @@ def unit_tests_vnet():
     diff = torch.abs(prev - curr).sum()
     print(diff)
 
-def plot_vnet_weights(vnet):
-
-    # norm_c = torch.sum(v_lambda)
-    #
-    # if norm_c != 0:
-    #     v_lambda_norm = v_lambda / norm_c
-    # else:
-    #     v_lambda_norm = v_lambda
-    #
-    # l_f_meta_array = cost_v * v_lambda
-
-    fig, ax = plt.subplots()
-    ax.plot(x, v_lambda_norm.cpu().detach().numpy())
-
-    ax.set(xlabel='loss', ylabel='weight',
-           title='vnet loss after task #' + str(task))
-    ax.grid()
-
-    address = "results/vnet/task{:d}.png".format(task)
-    fig.savefig(address)
 
 
 
