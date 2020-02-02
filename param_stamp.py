@@ -145,12 +145,21 @@ def get_param_stamp(args, model_name, verbose=True, replay=False, replay_model_n
         reweighting_stamp = "--{}{}".format(strategy_stamp, vnet_stamp)
 
 
-
+    sampling_stamp = ""
+    if args.ss !='none':
+        strategy_stamp = "{}".format(args.ss)
+        hard_sampling_stamp = ""
+        if strategy_stamp == "hard_sampling":
+            hard_sampling_stamp = "{}".format('_ n' + str(args.hs_samples))
+        else:
+            print('unsupported')
+            raise
+        sampling_stamp = "--{}{}".format(strategy_stamp, hard_sampling_stamp)
 
 
     # --> combine
-    param_stamp = "{}--{}--{}{}{}{}{}{}{}{}{}".format(
-        task_stamp, model_stamp, hyper_stamp, ewc_stamp, xdg_stamp, replay_stamp, exemplar_stamp, binLoss_stamp, imb_stamp, reweighting_stamp,
+    param_stamp = "{}--{}--{}{}{}{}{}{}{}{}{}{}".format(
+        task_stamp, model_stamp, hyper_stamp, ewc_stamp, xdg_stamp, replay_stamp, exemplar_stamp, binLoss_stamp, imb_stamp, reweighting_stamp, sampling_stamp,
         "-s{}".format(args.seed) if not args.seed==0 else "",
     )
 
