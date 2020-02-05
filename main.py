@@ -536,7 +536,7 @@ def run(args):
     # If requested, generate pdf
     if args.pdf:
         # -open pdf
-        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.p_dir, param_stamp))
+        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.r_dir, param_stamp))
 
         # -show samples and reconstructions (either from main model or from separate generator)
         if args.feedback or args.replay=="generative":
