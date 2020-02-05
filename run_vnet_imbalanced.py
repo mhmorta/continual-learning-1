@@ -6,20 +6,20 @@ commands = []
 # Joint-training
 # commands.append('python ./main.py  --tasks=1 --experiment=splitMNIST')
 # commands.append('python ./main.py  --tasks=1 --experiment=splitFashionMNIST')
-commands.append('python ./main.py  --tasks=1 --experiment=splitCIFAR10 --model_type=resnet32 --iters=12000')
+# commands.append('python ./main.py  --tasks=1 --experiment=splitCIFAR10 --model_type=resnet32 --iters=12000')
 
 # -----------------------------
 # --------- iCarl  -------------
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST ')
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST --rs=vnet')
+# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST ')
+# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST --rs=vnet')
 
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --iters=3000')
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --rs=vnet --iters=5000')
+# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --iters=3000')
+# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --rs=vnet --iters=5000')
 
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --iters=5000')
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --iters=5000 --rs=vnet  ')
+# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --iters=5000')
+# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --iters=5000 --rs=vnet  ')
 
-# -----------------------------
+# # -----------------------------
 # --------- DGR  -------------
 
 commands.append('python ./main.py  --tasks=5 --experiment=splitMNIST --replay=generative ')
