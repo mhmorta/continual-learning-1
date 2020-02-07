@@ -362,7 +362,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             iters_left -= 1
             if iters_left==0:
                 if training_dataset_sampler is None:
-                    data_loader = iter(utils.get_data_loader(training_dataset, batch_size, cuda=cuda, drop_last=True))
+                    data_loader = iter(utils.get_data_loader(training_dataset, batch_size, cuda=cuda, drop_last=False))
                 else:
                     data_loader = iter(utils.get_data_loader(
                         training_dataset, batch_size, cuda=cuda, drop_last=True, sampler=training_dataset_sampler, shuffle=False

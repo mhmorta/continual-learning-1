@@ -5,9 +5,9 @@ import os
 commands = []
 
 # Joint-training
-# commands.append('python ./main.py  --tasks=1 --experiment=splitMNIST')
-# commands.append('python ./main.py  --tasks=1 --experiment=splitFashionMNIST')
-# commands.append('python ./main.py  --tasks=1 --experiment=splitCIFAR10 --model_type=resnet32 --iters=15000')
+commands.append('python ./main.py  --tasks=1 --experiment=splitMNIST')
+commands.append('python ./main.py  --tasks=1 --experiment=splitFashionMNIST')
+commands.append('python ./main.py  --tasks=1 --experiment=splitCIFAR10 --model_type=resnet32 --iters=15000')
 
 # Fine-tuning
 # commands.append('python ./main.py  --tasks=5 --experiment=splitMNIST')
@@ -17,11 +17,11 @@ commands = []
 # -----------------------------
 # --------- iCarl  -------------
 
-# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST ')
-# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST --rs=vnet')
-#
-# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST ')
-# commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --rs=vnet')
+commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST ')
+commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitMNIST --rs=vnet')
+
+commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST ')
+commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --rs=vnet')
 
 commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --iters=3000')
 commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --iters=3000 --rs=vnet  ')
@@ -35,7 +35,9 @@ commands.append('python ./main.py  --tasks=5 --experiment=splitMNIST --replay=ge
 commands.append('python ./main.py  --tasks=5 --experiment=splitFashionMNIST --replay=generative ')
 commands.append('python ./main.py  --tasks=5 --experiment=splitFashionMNIST --replay=generative --rs=vnet')
 
-seeds = [1, 10, 100]
+# seeds = [1, 10, 100]
+seeds = [11, 101, 1001]
+
 result_dir = " --results-dir=./results/vnet_balanced"
 
 for i in range(len(commands)):

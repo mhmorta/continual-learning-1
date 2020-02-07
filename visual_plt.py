@@ -23,6 +23,7 @@ def plot_losses(vnet_dir, model_loss, model_vnet_loss, loss_original):
         ax.set(xlabel='Iteration', ylabel='loss value')
         plt.title('Loss plot')
         fig.savefig("{}/losses.png".format(vnet_dir))
+        plt.clf()
 
 def plot_class_vs_loss(vnet_dir, value_dict, task, title, file_name, normalized=None):
     fig, ax = plt.subplots()
@@ -38,13 +39,6 @@ def plot_class_vs_loss(vnet_dir, value_dict, task, title, file_name, normalized=
             y.append(value_dict[i])
         ax.plot(x, y, '.-')
 
-        # if normalized is not None:
-        #     y2 = []
-        #     for i in range(10):
-        #         y2.append(normalized[i])
-        #     ax.plot(x, y2, label='Normalized')
-
-
     else:
         for cls, weights in value_dict.items():
             max_len = len(weights) if len(weights) > max_len else max_len
@@ -56,6 +50,7 @@ def plot_class_vs_loss(vnet_dir, value_dict, task, title, file_name, normalized=
     ax.set(xlabel='Class', ylabel=file_name)
     plt.title(title)
     fig.savefig("{}/class_vs_{}.png".format(vnet_dir, file_name))
+    plt.clf()
 
 def plot_loss_vs_weight(vnet_dir, weight_dict, task=None):
     x = np.arange(0.00, 10.00, 0.1)
@@ -72,6 +67,7 @@ def plot_loss_vs_weight(vnet_dir, weight_dict, task=None):
 
     address = "{}/weights_task{}.png".format(vnet_dir, task)
     fig.savefig(address)
+    plt.clf()
 
 def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):
     '''Plot images in [image_tensor] as a grid with [nrow] into [pdf].
@@ -84,6 +80,7 @@ def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):
         plt.title(title)
     if pdf is not None:
         pdf.savefig()
+
 
 
 def plot_scatter_groups(x, y, colors=None, ylabel=None, xlabel=None, title=None, top_title=None, names=None,

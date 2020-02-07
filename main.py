@@ -24,7 +24,7 @@ parser.add_argument('--get-stamp', action='store_true', help='print param-stamp 
 parser.add_argument('--seed', type=int, default=0, help='random seed (for each random-module used)')
 parser.add_argument('--no-gpus', action='store_false', dest='cuda', help="don't use GPUs")
 parser.add_argument('--data-dir', type=str, default='./datasets', dest='d_dir', help="default: %(default)s")
-parser.add_argument('--plot-dir', type=str, default='./results', dest='p_dir', help="default: %(default)s")
+parser.add_argument('--plot-dir', type=str, default=None, dest='p_dir', help="default: %(default)s")
 parser.add_argument('--results-dir', type=str, default='./results', dest='r_dir', help="default: %(default)s")
 
 # expirimental task parameters
@@ -174,6 +174,8 @@ def run(args):
     # -create plots- and results-directories if needed
     if not os.path.isdir(args.r_dir):
         os.mkdir(args.r_dir)
+    if args.p_dir is None:
+        args.p_dir = args.r_dir
     if args.pdf and not os.path.isdir(args.p_dir):
         os.mkdir(args.p_dir)
 
@@ -379,7 +381,8 @@ def run(args):
     precision_dict_exemplars = evaluate.initiate_precision_dict(args.tasks) if args.use_exemplars else None
     # -visdom-settings
     if args.visdom:
-        env_name = "{exp}{tasks}-{scenario}".format(exp=args.experiment, tasks=args.tasks, scenario=args.scenario)
+        # env_name = "{exp}{tasks}-{scenario}".format(exp=args.experiment, tasks=args.tasks, scenario=args.scenario)
+        env_name = param_stamp
         graph_name = "{fb}{replay}{syn}{ewc}{xdg}{icarl}{bud}".format(
             fb="1M-" if args.feedback else "", replay="{}{}".format(args.replay, "D" if args.distill else ""),
             syn="-si{}".format(args.si_c) if args.si else "",
@@ -536,7 +539,7 @@ def run(args):
     # If requested, generate pdf
     if args.pdf:
         # -open pdf
-        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.r_dir, param_stamp))
+        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.p_dir, param_stamp))
 
         # -show samples and reconstructions (either from main model or from separate generator)
         if args.feedback or args.replay=="generative":
@@ -551,15 +554,20 @@ def run(args):
         figure = visual_plt.plot_lines(
             precision_dict["all_tasks"],
             x_axes=precision_dict["x_task"],
-            line_names=['task {}'.format(i + 1) for i in range(args.tasks)]
+            line_names=['task {}'.format(i + 1) for i in range(args.tasks)],
+            xlabel='Task id',
+            ylabel='Accuracy',
+            with_dots=True,
+            title='Accuracy of each task during the continual learning'
         )
         figure_list.append(figure)
         figure = visual_plt.plot_lines(
             [precision_dict["average"]],
             x_axes=precision_dict["x_task"],
-            line_names=['average all tasks so far'],
-            xlabel="Task #",
-            ylabel="Average precision score "
+            line_names=['Average accuracy over seen tasks'],
+            xlabel="Task id",
+            ylabel="Accuracy ",
+            with_dots=True
         )
         figure_list.append(figure)
         if args.use_exemplars:
