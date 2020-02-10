@@ -29,6 +29,7 @@ def get_dataset(name, type='train', download=True, capacity=None, permutation=No
     data_name = 'mnist' if name=='mnist28' else name
     dataset_class = AVAILABLE_DATASETS[data_name]
 
+    AVAILABLE_TRANSFORMS = AVAILABLE_TRANSFORMS_TRAIN if type=='train' else AVAILABLE_TRANSFORMS_TEST
     # specify image-transformations to be applied
     dataset_transform = transforms.Compose([
         *AVAILABLE_TRANSFORMS[name],
@@ -132,7 +133,7 @@ AVAILABLE_DATASETS = {
 }
 
 # specify available transforms.
-AVAILABLE_TRANSFORMS = {
+AVAILABLE_TRANSFORMS_TRAIN = {
     'mnist': [
         transforms.Pad(2),
         transforms.ToTensor(),
@@ -147,6 +148,24 @@ AVAILABLE_TRANSFORMS = {
         transforms.ToPILImage(),
         transforms.RandomCrop(32),
         transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
+                             std=[x / 255.0 for x in [63.0, 62.1, 66.7]]),
+    ],
+    'FashionMNIST': [
+        transforms.ToTensor(),
+    ],
+}
+
+AVAILABLE_TRANSFORMS_TEST = {
+    'mnist': [
+        transforms.Pad(2),
+        transforms.ToTensor(),
+    ],
+    'mnist28': [
+        transforms.ToTensor(),
+    ],
+    'cifar10': [
         transforms.ToTensor(),
         transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
                              std=[x / 255.0 for x in [63.0, 62.1, 66.7]]),
