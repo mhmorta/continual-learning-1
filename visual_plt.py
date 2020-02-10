@@ -69,13 +69,15 @@ def plot_loss_vs_weight(vnet_dir, weight_dict, task=None):
     fig.savefig(address)
     plt.clf()
 
-def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None):
+def plot_images_from_tensor(image_tensor, pdf=None, nrow=8, title=None, axis=False):
     '''Plot images in [image_tensor] as a grid with [nrow] into [pdf].
 
     [image_tensor]      <tensor> [batch_size]x[channels]x[width]x[height]'''
 
     image_grid = make_grid(image_tensor, nrow=nrow, pad_value=1)  # pad_value=0 would give black borders
     plt.imshow(np.transpose(image_grid.numpy(), (1,2,0)))
+    if axis==False:
+        plt.axis('off')
     if title:
         plt.title(title)
     if pdf is not None:
@@ -157,10 +159,15 @@ def plot_bar(numbers, names=None, colors=None, ylabel=None, title=None, top_titl
     return f
 
 
+
+def zero_to_nan(values):
+    """Replace every 0 with 'nan' and return a copy."""
+    return [float('nan') if x==0 else x for x in values]
+
 def plot_lines(list_with_lines, x_axes=None, line_names=None, colors=None, title=None,
                title_top=None, xlabel=None, ylabel=None, ylim=None, figsize=None, list_with_errors=None, errors="shaded",
                x_log=False, with_dots=False, h_line=None, h_label=None, h_error=None,
-               h_lines=None, h_colors=None, h_labels=None, h_errors=None):
+               h_lines=None, h_colors=None, h_labels=None, h_errors=None, nan_zeros=False):
     '''Generates a figure containing multiple lines in one plot.
 
     :param list_with_lines: <list> of all lines to plot (with each line being a <list> as well)
@@ -201,7 +208,8 @@ def plot_lines(list_with_lines, x_axes=None, line_names=None, colors=None, title
 
     # mean lines
     for task_id, name in enumerate(line_names):
-        axarr.plot(x_axes, list_with_lines[task_id], label=name,
+        y = zero_to_nan(list_with_lines[task_id]) if nan_zeros else list_with_lines[task_id]
+        axarr.plot(x_axes, y, label=name,
                    color=None if (colors is None) else colors[task_id],
                    linewidth=2, marker='o' if with_dots else None)
 

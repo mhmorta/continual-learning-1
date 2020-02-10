@@ -558,7 +558,8 @@ def run(args):
             xlabel='Task id',
             ylabel='Accuracy',
             with_dots=True,
-            title='Accuracy of each task during the continual learning'
+            title='Accuracy of each task during the continual learning',
+            nan_zeros=True
         )
         figure_list.append(figure)
         figure = visual_plt.plot_lines(

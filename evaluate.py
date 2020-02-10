@@ -165,7 +165,7 @@ def show_samples(model, config, pdf=None, visdom=None, size=32, title="Generated
     nrow = int(np.ceil(np.sqrt(size)))
     # -make plots
     if pdf is not None:
-        visual_plt.plot_images_from_tensor(image_tensor, pdf, title=title, nrow=nrow)
+        visual_plt.plot_images_from_tensor(image_tensor, pdf, title=title, nrow=nrow, axis=False)
     if visdom is not None:
         visual_visdom.visualize_images(
             tensor=image_tensor, name='Generated samples ({})'.format(visdom["graph"]), env=visdom["env"], nrow=nrow,
