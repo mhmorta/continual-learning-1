@@ -3,6 +3,7 @@ import numpy as np
 from torchvision import datasets, transforms
 from torch.utils.data import ConcatDataset, Dataset
 import torch
+import torch.nn.functional as F
 
 
 def _permutate_image_pixels(image, permutation):
@@ -141,6 +142,14 @@ AVAILABLE_TRANSFORMS = {
     ],
     'cifar10': [
         transforms.ToTensor(),
+        transforms.Lambda(lambda x: F.pad(x.unsqueeze(0),
+                                          (4, 4, 4, 4), mode='reflect').squeeze()),
+        transforms.ToPILImage(),
+        transforms.RandomCrop(32),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
+                             std=[x / 255.0 for x in [63.0, 62.1, 66.7]]),
     ],
     'FashionMNIST': [
         transforms.ToTensor(),

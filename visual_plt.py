@@ -162,7 +162,14 @@ def plot_bar(numbers, names=None, colors=None, ylabel=None, title=None, top_titl
 
 def zero_to_nan(values):
     """Replace every 0 with 'nan' and return a copy."""
-    return [float('nan') if x==0 else x for x in values]
+    results = [float('nan') if x==0 else x for x in values]
+    previous_val = False
+    for i in range(len(values)):
+        if values[i]==0 and previous_val:
+            results[i] = 0
+        elif values[i] != 0:
+            previous_val = True
+    return results
 
 def plot_lines(list_with_lines, x_axes=None, line_names=None, colors=None, title=None,
                title_top=None, xlabel=None, ylabel=None, ylim=None, figsize=None, list_with_errors=None, errors="shaded",
