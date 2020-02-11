@@ -60,7 +60,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
     # Initializations of the vnet
     if reweighting_strategy=='vnet':
-        vnet = VNet(1, 200, 1).to(device)
+        vnet = VNet(1, 100, 1).to(device)
 
         vnet_plot_freq = int(iters / (vnet_plot_count-1))
 
