@@ -313,7 +313,7 @@ class VNet(MetaModule):
         return torch.sigmoid(out)
 
     def loss_weights(self):
-        x = np.arange(0.00, 10.00, 0.1)
+        x = np.arange(0.00, 20.00, 0.1)
         x = torch.tensor(x).float().view(-1, 1).cuda()
         cost_v = self(x).cpu().detach()
         return cost_v

@@ -17,7 +17,7 @@ commands.append('python ./main.py  --tasks=1 --experiment=splitCIFAR10 --model_t
 # commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitFashionMNIST --rs=vnet --iters=5000')
 
 commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32')
-commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32')
+commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --model_type=resnet32 --rs=vnet')
 
 # # -----------------------------
 # --------- DGR  -------------

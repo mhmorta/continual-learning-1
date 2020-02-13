@@ -63,7 +63,7 @@ def plot_loss_vs_weight(vnet_dir, weight_dict, task=None):
 
     ax.set(xlabel='loss', ylabel='weights')
     ax.grid()
-    plt.title('Weight score per loss value fort task  {}'.format(task))
+    plt.title('Weight score per loss value for task  {}'.format(task))
 
     address = "{}/weights_task{}.png".format(vnet_dir, task)
     fig.savefig(address)
