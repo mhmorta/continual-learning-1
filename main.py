@@ -245,7 +245,7 @@ def run(args):
     elif model.optim_type=="sgd":
         model.optimizer = optim.SGD(model.optim_list)
     elif model.optim_type=="sgd_momentum":
-        model.optimizer = optim.SGD(model.optim_list,
+        model.optimizer = optim.SGD(model.optim_list, 0.1,
                                   momentum=0.9, nesterov=True,
                                   weight_decay=0.0005)
     else:
@@ -402,6 +402,8 @@ def run(args):
 
     #-------------------------------------------------------------------------------------------------#
 
+    pdf = visual_plt.open_pdf("{}/{}/report.pdf".format(args.p_dir, param_stamp)) if args.pdf else None
+
     #---------------------#
     #----- CALLBACKS -----#
     #---------------------#
@@ -419,7 +421,7 @@ def run(args):
 
     # Callbacks for evaluating and plotting generated / reconstructed samples
     sample_cbs = [
-        cb._sample_cb(log=args.sample_log, visdom=visdom, config=config, test_datasets=test_datasets,
+        cb._sample_cb(log=args.sample_log, visdom=visdom, config=config, test_datasets=test_datasets, pdf=pdf,
                       sample_size=args.sample_n, iters_per_task=args.iters if args.feedback else args.g_iters)
     ] if (train_gen or args.feedback) else [None]
 
@@ -539,7 +541,7 @@ def run(args):
     # If requested, generate pdf
     if args.pdf:
         # -open pdf
-        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.p_dir, param_stamp))
+        pp = visual_plt.open_pdf("{}/{}/report.pdf".format(args.p_dir, param_stamp)) if pdf is None else pdf
 
         # -show samples and reconstructions (either from main model or from separate generator)
         if args.feedback or args.replay=="generative":

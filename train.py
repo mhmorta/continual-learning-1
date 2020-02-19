@@ -68,7 +68,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
         vnet_weights_dict[0] = vnet.loss_weights()
 
         if vnet_opt=='sgd_momentum':
-            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-5,
                                           momentum=0.9, nesterov=True,
                                           weight_decay=5e-4)
         elif vnet_opt=='sgd':
@@ -107,8 +107,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
     # Loop over all tasks.
     for task, train_dataset in enumerate(train_datasets, 1):
         if reset_vnet == True:
-            vnet = VNet(1, 200, 1).to(device)
-            optimizer_c = torch.optim.SGD(vnet.params(), 1e-3,
+            vnet = VNet(1, 100, 1).to(device)
+            optimizer_c = torch.optim.SGD(vnet.params(), 1e-5,
                                           momentum=0.9, nesterov=True,
                                           weight_decay=5e-4)
 
@@ -127,6 +127,35 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             sampler=rand_sampler, shuffle=False
         ))
         x_meta, y_meta = next(train_meta_loader)
+
+        # if len(train_datasets)==1:
+        #     data_list_val = {}
+        #     for j in range(10):
+        #         data_list_val[j] = [i for i, label in enumerate(train_dataset.dataset.targets) if label == j]
+
+        #     idx_to_meta = []
+        #     idx_to_train = []
+        #     img_num_list = [10] * 10
+        #     print(img_num_list)
+
+        #     for cls_idx, img_id_list in data_list_val.items():
+        #         np.random.shuffle(img_id_list)
+        #         img_num = img_num_list[int(cls_idx)]
+        #         idx_to_meta.extend(img_id_list[:img_num])
+        #         idx_to_train.extend(img_id_list[img_num:])
+
+        #     train_data = copy.deepcopy(train_dataset)
+        #     train_data_meta = copy.deepcopy(train_dataset)
+
+        #     train_data_meta.dataset.data = np.delete(train_dataset.dataset.data, idx_to_train, axis=0)
+        #     train_data_meta.dataset.targets = np.delete(train_dataset.dataset.targets, idx_to_train, axis=0)
+        #     train_dataset.dataset.data = np.delete(train_dataset.dataset.data, idx_to_meta, axis=0)
+        #     train_dataset.dataset.targets = np.delete(train_dataset.dataset.targets, idx_to_meta, axis=0)
+
+        #     train_data_meta.sub_indeces =  train_data_meta.sub_indeces[:100]
+
+        #     validation_loader = torch.utils.data.DataLoader(
+        #         train_data_meta, batch_size=100, shuffle=True, num_workers=0, pin_memory=True)
         # ---------------- end of meta-training --------------------
 
         if reweighting_strategy=='vnet' or reweighting_strategy=='meta_update' or reweighting_strategy=='hard_sampling':
@@ -579,6 +608,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
                     # --- update vnet ---
 
+                    # input_validation, target_validation = next(iter(validation_loader))
                     input_validation, target_validation = x_meta, y_meta
                     input_validation_var = to_var(input_validation, requires_grad=False)
                     target_validation_var = to_var(target_validation.type(torch.LongTensor), requires_grad=False)
@@ -681,11 +711,12 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             plot_loss_vs_weight(vnet_dir, vnet_weights_dict, task)
 
         # plot class weights
-        if reweighting_strategy=='vnet':
+        if use_vnet_for_loss:
             # curentdata_data_loader = iter(cycle(utils.get_data_loader(
             #     train_dataset, 128, cuda=cuda, drop_last=False, shuffle=True
             # )))
 
+            # x, y = next(iter(validation_loader))
             x, y = x_meta, y_meta
             x = to_var(x, requires_grad=False)
             y = to_var(y.type(torch.LongTensor), requires_grad=False)
@@ -706,15 +737,19 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
             l_f_meta = cost_v * v_lambda_norm
 
-            for cls in new_classes:
-                class_loss[cls].append(cost[y==cls].mean())
-                class_weights[cls].append(v_lambda[y==cls].mean())
-                class_weighted_loss[cls].append(v_lambda_norm[y==cls].mean())
+            # for cls in new_classes:
+            #     class_loss[cls].append(cost[y==cls].mean())
+            #     class_weights[cls].append(v_lambda[y==cls].mean())
+            #     class_weighted_loss[cls].append(v_lambda_norm[y==cls].mean())
 
-            if task == len(train_datasets):
-                plot_class_vs_loss(vnet_dir, class_loss, task, title='CE loss of classes', file_name='loss')
-                plot_class_vs_loss(vnet_dir, class_weights, task,title='Weight of classes', file_name='weight')
-                plot_class_vs_loss(vnet_dir, class_weighted_loss, task, title='Normalized weighted of classes', file_name='normalized weights')
+            temp = {}
+            for i in range(new_classes[-1]+1):
+                temp[i] = cost[y==i].mean()
+
+            # if task == len(train_datasets):
+            plot_class_vs_loss(vnet_dir, temp, task, title='CE loss of classes', file_name='loss')
+            # plot_class_vs_loss(vnet_dir, class_weights, task,title='Weight of classes', file_name='weight')
+            # plot_class_vs_loss(vnet_dir, class_weighted_loss, task, title='Normalized weighted of classes', file_name='normalized weights')
 
         # plot losses
         if reweighting_strategy=='vnet' and task == len(train_datasets):

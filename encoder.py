@@ -135,30 +135,36 @@ class Classifier(ContinualLearner, Replayer, ExemplarHandler):
             # or vnet
             elif use_vnet_for_loss:
                 # For JT case
-                if task == 1:
-                    # cost_w = F.cross_entropy(y_hat, y,reduction='none')
-                    binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
-                    if self.binaryCE_distill and (scores is not None):
-                        classes_per_task = int(y_hat.size(1) / task)
-                        binary_targets = binary_targets[:, -(classes_per_task):]
-                        binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
-                    cost_w = None if y is None else F.binary_cross_entropy_with_logits(
-                        input=y_hat, target=binary_targets, reduction='none'
-                    )     #--> sum over classes, then average over batch
-                    cost_w = cost_w.sum(dim=1)
-                elif task > 1:
-                    # y_f = model(input_var)
-                    # -binary prediction loss
-                    binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
-                    if self.binaryCE_distill and (scores is not None):
-                        classes_per_task = int(y_hat.size(1) / task)
-                        binary_targets = binary_targets[:, -(classes_per_task):]
-                        binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
-                    cost_w = None if y is None else F.binary_cross_entropy_with_logits(
-                        input=y_hat, target=binary_targets, reduction='none'
-                    )     #--> sum over classes, then average over batch
-                    cost_w = cost_w.sum(dim=1)
-
+                if self.binaryCE_distill and (scores is not None):
+                    if task == 1:
+                        # cost_w = F.cross_entropy(y_hat, y,reduction='none')
+                        binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
+                        if self.binaryCE_distill and (scores is not None):
+                            classes_per_task = int(y_hat.size(1) / task)
+                            binary_targets = binary_targets[:, -(classes_per_task):]
+                            binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
+                        cost_w = None if y is None else F.binary_cross_entropy_with_logits(
+                            input=y_hat, target=binary_targets, reduction='none'
+                        )     #--> sum over classes, then average over batch
+                        cost_w = cost_w.sum(dim=1)
+                    elif task > 1:
+                        # y_f = model(input_var)
+                        # -binary prediction loss
+                        binary_targets = utils.to_one_hot(y.cpu(), y_hat.size(1)).to(y.device)
+                        if self.binaryCE_distill and (scores is not None):
+                            classes_per_task = int(y_hat.size(1) / task)
+                            binary_targets = binary_targets[:, -(classes_per_task):]
+                            binary_targets = torch.cat([torch.sigmoid(scores / self.KD_temp), binary_targets], dim=1)
+                        cost_w = None if y is None else F.binary_cross_entropy_with_logits(
+                            input=y_hat, target=binary_targets, reduction='none'
+                        )     #--> sum over classes, then average over batch
+                        cost_w = cost_w.sum(dim=1)
+                else:
+                    cost_w = F.cross_entropy(y_hat, y, reduction='none')
+                # for i in range(10):
+                #     print(len(np.where(y.cpu().detach()==i)[0]))
+                # counts = [len(np.where(y==i)[0]) for i in range(10)]
+                # print(counts)
                 cost_v = torch.reshape(cost_w, (len(cost_w), 1))
                 # prec_train = accuracy(y_f.data, target_var.data, topk=(1,))[0]
 

@@ -32,28 +32,34 @@ def plot_class_vs_loss(vnet_dir, value_dict, task, title, file_name, normalized=
 
     max_len = 0
     # For the JT case
-    if task == 1:
-        x = np.arange(1, 10.01)
-        y = []
-        for i in range(10):
-            y.append(value_dict[i])
-        ax.plot(x, y, '.-')
+    # if task == 1:
+    #     x = np.arange(1, 10.01)
+    #     y = []
+    #     for i in range(10):
+    #         y.append(value_dict[i])
+    #     ax.plot(x, y, '.-')
+    #
+    # else:
 
-    else:
-        for cls, weights in value_dict.items():
-            max_len = len(weights) if len(weights) > max_len else max_len
-            x = np.arange(max_len - len(weights) + 1, max_len +1)
-            ax.plot( x, weights, '.-', label='Class {:d}'.format(cls))
+    # https://pythonspot.com/matplotlib-bar-chart/
+    vals = []
+    for key, val in value_dict.items():
+        vals.append(val.cpu().detach().numpy())
+    keys = np.array(list(value_dict.keys()))
+    values = np.array(vals)
+
+    plt.bar(keys, values, align='center', alpha=0.5)
+        # plt.xticks(keys, values)
 
     plt.legend(loc='best')
 
     ax.set(xlabel='Class', ylabel=file_name)
     plt.title(title)
-    fig.savefig("{}/class_vs_{}.png".format(vnet_dir, file_name))
+    fig.savefig("{}/t{}_class_vs_{}.png".format(vnet_dir, task, file_name))
     plt.clf()
 
 def plot_loss_vs_weight(vnet_dir, weight_dict, task=None):
-    x = np.arange(0.00, 10.00, 0.1)
+    x = np.arange(0.00, 20.00, 0.1)
 
     fig, ax = plt.subplots()
     for id, weight in weight_dict.items():

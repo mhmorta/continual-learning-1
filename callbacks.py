@@ -6,7 +6,7 @@ import evaluate
 ## Callback-functions for evaluating model-performance ##
 #########################################################
 
-def _sample_cb(log, config, visdom=None, test_datasets=None, sample_size=64, iters_per_task=None):
+def _sample_cb(log, config, visdom=None, test_datasets=None, sample_size=64, iters_per_task=None, pdf=None):
     '''Initiates function for evaluating samples of generative model.
 
     [test_datasets]     None or <list> of <Datasets> (if provided, also reconstructions are shown)'''
@@ -22,10 +22,10 @@ def _sample_cb(log, config, visdom=None, test_datasets=None, sample_size=64, ite
             if test_datasets is not None:
                 # Reconstruct samples from current task
                 evaluate.show_reconstruction(generator, test_datasets[task-1], config, size=int(sample_size/2),
-                                             visdom=visdom, task=task)
+                                             visdom=visdom, task=task, pdf=pdf)
 
             # Generate samples
-            evaluate.show_samples(generator, config, visdom=visdom, size=sample_size,
+            evaluate.show_samples(generator, config, visdom=visdom, size=sample_size, pdf=pdf,
                                   title="Generated images after {} iters in task {}".format(batch, task))
 
     # Return the callback-function (except if neither visdom or pdf is selected!)
