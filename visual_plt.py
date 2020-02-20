@@ -16,12 +16,15 @@ def plot_losses(vnet_dir, model_loss, model_vnet_loss, loss_original):
     if len(model_loss) > 0:
         fig, ax = plt.subplots()
         x = np.arange(1, len(model_loss)+0.1)
-        ax.plot(x, model_loss, label='Model\'s loss')
-        ax.plot(x, model_vnet_loss, label='vnet\'s loss')
+        if model_loss[0] is not None:
+            ax.plot(x, model_loss, label='CE loss')
+        if model_vnet_loss[-1
+        ] is not None:
+            ax.plot(x, model_vnet_loss, label='vnet loss')
         plt.legend(loc='best')
 
-        ax.set(xlabel='Iteration', ylabel='loss value')
-        plt.title('Loss plot')
+        ax.set(xlabel='Iteration', ylabel='loss')
+        plt.title('Loss over the training dataset')
         fig.savefig("{}/losses.png".format(vnet_dir))
         plt.clf()
 

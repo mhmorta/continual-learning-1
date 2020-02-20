@@ -455,6 +455,8 @@ def run(args):
     print("--> Training:")
     # Keep track of training-time
     start = time.time()
+
+    result_dir = "{}/{}/".format(args.r_dir, param_stamp)
     # Train model
     train_cl(
         model, train_datasets, test_datasets, replay_mode=args.replay, scenario=scenario, classes_per_task=classes_per_task,
@@ -466,7 +468,7 @@ def run(args):
         reset_vnet_optim=args.reset_vnet_optim, vnet_enable_from = args.vnet_enable_from,
         vnet_exemplars_per_class = args.vnet_exemplars_per_class, metadataset_building_strategy = args.metadataset_building_strategy,
         reweighting_strategy = args.rs, vnet_loss_ratio=args.vnet_loss_ratio, vnet_opt=args.vnet_opt, vnet_dir= vnet_dir,
-        sampling_strategy = args.ss, vnet_plot_count = args.vnet_plot_count, hs_samples = args.hs_samples
+        sampling_strategy = args.ss, vnet_plot_count = args.vnet_plot_count, hs_samples = args.hs_samples, result_dir=result_dir
     )
     # Get total training-time in seconds, and write to file
     training_time = time.time() - start
@@ -588,6 +590,7 @@ def run(args):
 
         # -close pdf
         pp.close()
+    print(param_stamp)
 
 
 

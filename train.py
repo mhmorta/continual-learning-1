@@ -20,7 +20,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
              use_exemplars=True, add_exemplars=False, eval_cbs_exemplars=list(), reweighting_strategy = 'none', imb_factor = 1.0,
              imb_inverse= False, reset_vnet = False, reset_vnet_optim=False, vnet_enable_from = 2, vnet_exemplars_per_class = 20,
              metadataset_building_strategy = 'none', vnet_loss_ratio=0.5, vnet_opt=None, vnet_dir = "", sampling_strategy=None,
-             vnet_plot_count = 4, hs_samples = 40):
+             vnet_plot_count = 4, hs_samples = 40, result_dir=""):
     '''Train a model (with a "train_a_batch" method) on multiple tasks, with replay-strategy specified by [replay_mode].
 
     [model]             <nn.Module> main model to optimize across all tasks
@@ -87,14 +87,15 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             class_loss[i] = []
             class_weighted_loss[i] = []
 
-        loss_list = []
-        vnet_loss_list = []
-        loss_original_list = []
+
 
         meta_sub_indeces_list = []
         torch.backends.cudnn.benchmark = True
 
 
+    loss_list = []
+    vnet_loss_list = []
+    loss_original_list = []
 
     metadata_list = []
     CE_weights = None
@@ -452,7 +453,9 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                 x_exemplars = to_var(x_exemplars, requires_grad=False)
                 y_exemplars = to_var(y_exemplars, requires_grad=False)
 
-                y_pred = meta_model(x_exemplars)
+                # y_pred = meta_model(x_exemplars)
+                y_pred = meta_model(x_exemplars)[:, active_classes]
+
                 cost = F.cross_entropy(y_pred, y_exemplars, reduce=False)
 
                 x_top = x_exemplars[torch.topk(cost, hs_samples)[1]]
@@ -613,7 +616,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                     input_validation_var = to_var(input_validation, requires_grad=False)
                     target_validation_var = to_var(target_validation.type(torch.LongTensor), requires_grad=False)
 
-                    y_g_hat = meta_model(input_validation_var)
+                    y_g_hat = meta_model(input_validation_var)[:, active_classes]
                     l_g_meta = F.cross_entropy(y_g_hat, target_validation_var)
                     # prec_meta = accuracy(y_g_hat.data, target_validation_var.data, topk=(1,))[0]
 
@@ -658,10 +661,10 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
                                                 use_vnet_for_loss=use_vnet_for_loss, loss_weights = CE_weights, vnet_loss_ratio=vnet_loss_ratio)
                 # -----------------------------------------
 
-                if reweighting_strategy=='vnet':
-                    loss_list.append(loss_dict['loss_current'])
-                    vnet_loss_list.append(loss_dict['loss_vnet'])
-                    loss_original_list.append((loss_dict['loss_original']))
+                # if reweighting_strategy=='vnet':
+                loss_list.append(loss_dict['loss_current'])
+                vnet_loss_list.append(loss_dict['loss_vnet'])
+                loss_original_list.append((loss_dict['loss_original']))
 
                 # Update running parameter importance estimates in W
                 if isinstance(model, ContinualLearner) and (model.si_c>0):
@@ -752,8 +755,8 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
             # plot_class_vs_loss(vnet_dir, class_weighted_loss, task, title='Normalized weighted of classes', file_name='normalized weights')
 
         # plot losses
-        if reweighting_strategy=='vnet' and task == len(train_datasets):
-            plot_losses(vnet_dir, loss_list, vnet_loss_list, loss_original_list)
+        if task == len(train_datasets):
+            plot_losses(result_dir, loss_list, vnet_loss_list, loss_original_list)
 
         # -------------------------------------------
         # Close progress-bar(s)
