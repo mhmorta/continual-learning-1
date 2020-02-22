@@ -9,6 +9,7 @@ commands = []
 # commands.append('python ./main.py  --tasks=5 --icarl --experiment=splitCIFAR10 --iters=2000 --budget=2000')
 
 # MNIST
+commands.append('python ./main.py   --icarl')
 commands.append('python ./main.py   --icarl  --ss=hard_sampling')
 
 
@@ -39,7 +40,7 @@ seeds = [11, 101]
 budgets = [200, 500, 1000, 2000]
 iterss = [500, 1000, 2000]
 hs_samples = [40, 64]
-result_dir = " --results-dir=./results/sampling_strategy"
+result_dir = " --results-dir=./results/sampling_strategy/new/"
 
 for i in range(len(commands)):
     for seed in seeds:
