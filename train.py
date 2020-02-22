@@ -436,7 +436,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
                 meta_model.load_state_dict(model.state_dict())
 
-                y_f_hat = meta_model(input_var)
+                y_f_hat = meta_model(input_var)[:, active_classes]
                 l = F.cross_entropy(y_f_hat, target_var)
 
                 meta_model.optim_list = [{'params': filter(lambda p: p.requires_grad, meta_model.params()), 'lr': 0.001}]
@@ -587,7 +587,7 @@ def train_cl(model, train_datasets, meta_datasets, replay_mode="none", scenario=
 
                     meta_model.load_state_dict(model.state_dict())
 
-                    y_f_hat = meta_model(input_var)
+                    y_f_hat = meta_model(input_var)[:, active_classes]
                     cost = F.cross_entropy(y_f_hat, target_var, reduce=False)
                     cost_v = torch.reshape(cost, (len(cost), 1))
 
