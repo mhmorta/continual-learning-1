@@ -67,11 +67,11 @@ def validate(model, dataset, batch_size=128, test_size=1024, verbose=True, allow
     # Set model back to its initial mode, print result on screen (if requested) and return it
     model.train(mode=mode)
     if verbose:
-        print('=> accuracy: {:.3f}'.format(precision))
+        # print('=> accuracy: {:.3f}'.format(precision))
 
         labels_list = torch.cat(labels_list, dim=0).cpu()
         predicted_list = torch.cat(predicted_list, dim=0).cpu()
-        print(confusion_matrix(labels_list, predicted_list, labels=range(10)))
+        # print(confusion_matrix(labels_list, predicted_list, labels=range(10)))
 
     return precision
 
@@ -87,7 +87,7 @@ def initiate_precision_dict(n_tasks):
 
 
 def precision(model, datasets, current_task, iteration, classes_per_task=None, scenario="class",
-              precision_dict=None, test_size=None, visdom=None, verbose=False, summary_graph=True,
+              precision_dict=None, test_size=None, visdom=None, verbose=True, summary_graph=True,
               with_exemplars=False, no_task_mask=False):
     '''Evaluate precision of a classifier (=[model]) on all tasks so far (= up to [current_task]) using [datasets].
 
@@ -117,6 +117,7 @@ def precision(model, datasets, current_task, iteration, classes_per_task=None, s
     # Print results on screen
     if verbose:
         print(' => ave precision: {:.3f}'.format(average_precs))
+        print(precs)
 
     # Send results to visdom server
     names = ['task {}'.format(i + 1) for i in range(n_tasks)]

@@ -499,7 +499,7 @@ def run(args):
     # -with exemplars
     if args.use_exemplars:
         precs = [evaluate.validate(
-            model, test_datasets[i], verbose=False, test_size=None, task=i+1, with_exemplars=True,
+            model, test_datasets[i], verbose=True, test_size=None, task=i+1, with_exemplars=True,
             allowed_classes=list(range(classes_per_task*i, classes_per_task*(i+1))) if scenario=="task" else None
         ) for i in range(args.tasks)]
         print("\n Accuracy on test-set (classification using exemplars):")
@@ -569,10 +569,12 @@ def run(args):
         figure = visual_plt.plot_lines(
             [precision_dict["average"]],
             x_axes=precision_dict["x_task"],
-            line_names=['Average accuracy over seen tasks'],
-            xlabel="Task id",
+            title='Average accuracy over learned tasks',
+            line_names = ['Average test accuracy'],
+            xlabel="Learned tasks",
             ylabel="Accuracy ",
-            with_dots=True
+            with_dots=True,
+            ylim=(-0.05,1.05)
         )
         figure_list.append(figure)
         if args.use_exemplars:

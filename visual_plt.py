@@ -24,6 +24,7 @@ def plot_losses(vnet_dir, model_loss, model_vnet_loss, loss_original):
         plt.legend(loc='best')
 
         ax.set(xlabel='Iteration', ylabel='loss')
+        plt.ylim(-0.5, 10.5)
         plt.title('Loss over the training dataset')
         fig.savefig("{}/losses.png".format(vnet_dir))
         plt.clf()
@@ -228,6 +229,7 @@ def plot_lines(list_with_lines, x_axes=None, line_names=None, colors=None, title
         axarr.plot(x_axes, y, label=name,
                    color=None if (colors is None) else colors[task_id],
                    linewidth=2, marker='o' if with_dots else None)
+        axarr.set_xticks(x_axes)
 
     # add horizontal line
     if h_line is not None:
